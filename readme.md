@@ -1,5 +1,7 @@
 Parody for [zookeeper](https://zookeeper.apache.org) client for [amphp](https://amphp.org)
 
+[![Build Status](https://github.com/vajexal/amp-zookeeper/workflows/Build/badge.svg)](https://github.com/vajexal/amp-zookeeper/actions)
+
 ### Installation
 
 ```bash
