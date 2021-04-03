@@ -1,0 +1,31 @@
+{
+    "name": "vajexal/amp-zookeeper",
+    "description": "Zookeeper client for amphp",
+    "keywords": [
+        "amphp",
+        "zookeeper"
+    ],
+    "require": {
+        "php": "^8.0",
+        "amphp/log": "^1.1",
+        "amphp/socket": "^1.1"
+    },
+    "require-dev": {
+        "amphp/php-cs-fixer-config": "dev-master",
+        "amphp/phpunit-util": "^1.4",
+        "symfony/var-dumper": "^5.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vajexal\\AmpZookeeper\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vajexal\\AmpZookeeper\\Tests\\": "tests"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
