@@ -15,6 +15,9 @@
         "amphp/phpunit-util": "^1.4",
         "symfony/var-dumper": "^5.2"
     },
+    "suggest": {
+        "ext-mbstring": "Allow to work properly with unicode symbols"
+    },
     "autoload": {
         "psr-4": {
             "Vajexal\\AmpZookeeper\\": "src"
