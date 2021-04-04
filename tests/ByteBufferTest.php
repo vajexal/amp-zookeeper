@@ -59,4 +59,23 @@ class ByteBufferTest extends TestCase
         $this->assertEquals(1, $requestHeader->getXid());
         $this->assertEquals(OpCode::GET_DATA, $requestHeader->getType());
     }
+
+    public function testNegativeNumbers()
+    {
+        $bb = new ByteBuffer;
+
+        $bb->writeInt(-123);
+        $bb->writeLong(-123);
+        $bb->writeFloat(-1.23);
+        $bb->writeDouble(-1.23);
+
+        $this->assertEquals('FF FF FF 85 FF FF FF FF FF FF FF 85 BF 9D 70 A4 BF F3 AE 14 7A E1 47 AE', $bb->toHex());
+
+        $bb->rewind();
+
+        $this->assertEquals(-123, $bb->readInt());
+        $this->assertEquals(-123, $bb->readLong());
+        $this->assertEqualsWithDelta(-1.23, $bb->readFloat(), 0.0001);
+        $this->assertEqualsWithDelta(-1.23, $bb->readDouble(), 0.0001);
+    }
 }
