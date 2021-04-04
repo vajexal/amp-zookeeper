@@ -77,6 +77,10 @@ class Zookeeper
     public function close(): Promise
     {
         return call(function () {
+            if ($this->socket->isClosed()) {
+                return;
+            }
+
             $requestHeader = new RequestHeader($this->xid, OpCode::CLOSE_SESSION);
             $packet        = new Packet($requestHeader);
 
