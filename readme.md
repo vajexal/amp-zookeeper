@@ -17,13 +17,12 @@ declare(strict_types=1);
 
 use Amp\Loop;
 use Vajexal\AmpZookeeper\Zookeeper;
-use Vajexal\AmpZookeeper\ZookeeperConfig;
 
 require_once 'vendor/autoload.php';
 
 Loop::run(function () {
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect(new ZookeeperConfig);
+    $zk = yield Zookeeper::connect();
 
     yield $zk->create('/foo', 'bar');
     var_dump(yield $zk->get('/foo'));

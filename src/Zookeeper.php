@@ -42,11 +42,13 @@ class Zookeeper
     }
 
     /**
-     * @param ZookeeperConfig $config
+     * @param ZookeeperConfig|null $config
      * @return Promise<self>
      */
-    public static function connect(ZookeeperConfig $config): Promise
+    public static function connect(ZookeeperConfig $config = null): Promise
     {
+        $config ??= new ZookeeperConfig;
+
         return call(function () use ($config) {
             $zk = new self;
 

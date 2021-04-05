@@ -7,7 +7,6 @@ namespace Vajexal\AmpZookeeper\Tests;
 use Amp\PHPUnit\AsyncTestCase;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Zookeeper;
-use Vajexal\AmpZookeeper\ZookeeperConfig;
 
 class ZookeeperTest extends AsyncTestCase
 {
@@ -19,7 +18,7 @@ class ZookeeperTest extends AsyncTestCase
 
         $this->setTimeout(5000);
 
-        $this->zk = yield Zookeeper::connect(new ZookeeperConfig);
+        $this->zk = yield Zookeeper::connect();
     }
 
     protected function tearDownAsync()
