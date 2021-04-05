@@ -6,11 +6,13 @@ namespace Vajexal\AmpZookeeper;
 
 use Countable;
 use Iterator;
+use RuntimeException;
 use Stringable;
-use Vajexal\AmpZookeeper\Exception\KeeperException;
 
 class ByteBuffer implements Countable, Iterator, Stringable
 {
+    private const MAX_BUFFER_SIZE = 0xfffff;
+
     private string $data     = '';
     private int    $position = 0;
 
@@ -154,10 +156,10 @@ class ByteBuffer implements Countable, Iterator, Stringable
         return \array_map($reader, \range(1, $len));
     }
 
-    private function checkLength(int $len)
+    private function checkLength(int $len): void
     {
-        if ($len < 0 || $len > 0xfffff) {
-            throw new KeeperException(\sprintf('Unreasonable length = %d', $len));
+        if ($len < 0 || $len > self::MAX_BUFFER_SIZE) {
+            throw new RuntimeException(\sprintf('Unreasonable length = %d', $len));
         }
     }
 
