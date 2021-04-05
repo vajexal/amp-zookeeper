@@ -52,11 +52,11 @@ class Zookeeper
 
             $zk->logger = $config->getLogger();
 
-            // todo parse connection string
+            $connectStringParser = new ConnectStringParser($config->getConnectString());
             // todo ping
 
             /** @var EncryptableSocket $socket */
-            $zk->socket = yield connect($config->getConnectString());
+            $zk->socket = yield connect($connectStringParser->getRandomServer()->getAuthority());
 
             $request = new ConnectRequest(0, 0, $config->getSessionTimeout(), 0, \str_repeat("\0", 16));
             $packet  = new Packet(null, $request);
