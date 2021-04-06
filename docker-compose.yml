@@ -3,5 +3,7 @@ version: '3.8'
 services:
   zookeeper:
     image: zookeeper
+    environment:
+      ZOO_TICK_TIME: 500
     ports:
       - 2181:2181

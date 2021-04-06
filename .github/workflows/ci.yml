@@ -17,6 +17,8 @@ jobs:
     services:
       zookeeper:
         image: zookeeper
+        env:
+          ZOO_TICK_TIME: 500
         ports:
           - 2181:2181
 
