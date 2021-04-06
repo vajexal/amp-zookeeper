@@ -76,6 +76,8 @@ class ZookeeperTest extends AsyncTestCase
                 ->sessionTimeout(1000)
         );
 
+        $this->assertEquals(1000, $zk->getSessionTimeout());
+
         yield new Delayed(2000);
 
         $this->assertFalse(yield $zk->exists('/foo'));

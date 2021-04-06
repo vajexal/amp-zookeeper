@@ -33,17 +33,17 @@ use function Amp\Socket\connect;
 class Zookeeper
 {
     private const PING_XID               = -2;
-    private const PING_INTERVAL          = 1000;
     private const MAX_SEND_PING_INTERVAL = 10000;
 
     /** @var Packet[] */
-    private array           $queue;
-    private int             $xid           = 0;
+    private array           $queue          = [];
+    private int             $xid            = 0;
     private Socket          $socket;
     private LoggerInterface $logger;
-    private string          $pingWatcherId = '';
-    private int             $maxIdleTime;
-    private int             $lastSend;
+    private int             $sessionTimeout = 0;
+    private string          $pingWatcherId  = '';
+    private int             $maxIdleTime    = 0;
+    private int             $lastSend       = 0;
 
     private function __construct()
     {
@@ -71,10 +71,11 @@ class Zookeeper
             $packet  = new Packet(null, $request);
 
             $zk->writePacket($packet);
-            yield $zk->waitForRecord(ConnectResponse::class);
-            $zk->queue = [];
+            /** @var ConnectResponse $response */
+            $response           = yield $zk->waitForRecord(ConnectResponse::class);
+            $zk->sessionTimeout = $response->getTimeOut();
 
-            $zk->setupPing($config);
+            $zk->setupPing();
             $zk->listenForPackets();
 
             return $zk;
@@ -239,11 +240,11 @@ class Zookeeper
         });
     }
 
-    private function setupPing(ZookeeperConfig $config): void
+    private function setupPing(): void
     {
-        $this->maxIdleTime = (int) ($config->getSessionTimeout() * 2 / 3);
+        $this->maxIdleTime = (int) ($this->sessionTimeout * 2 / 3);
 
-        $this->pingWatcherId = Loop::repeat(self::PING_INTERVAL, function () {
+        $this->pingWatcherId = Loop::repeat($this->sessionTimeout / 4, function () {
             $idle = Loop::now() - $this->lastSend;
 
             if ($idle > $this->maxIdleTime || $idle > self::MAX_SEND_PING_INTERVAL) {
@@ -340,5 +341,10 @@ class Zookeeper
     private function updateLastSend(): void
     {
         $this->lastSend = Loop::now();
+    }
+
+    public function getSessionTimeout(): int
+    {
+        return $this->sessionTimeout;
     }
 }
