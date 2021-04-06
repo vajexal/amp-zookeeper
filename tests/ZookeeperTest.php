@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper\Tests;
 
+use Amp\Delayed;
 use Amp\PHPUnit\AsyncTestCase;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Zookeeper;
+use Vajexal\AmpZookeeper\ZookeeperConfig;
 
 class ZookeeperTest extends AsyncTestCase
 {
@@ -64,5 +66,20 @@ class ZookeeperTest extends AsyncTestCase
         } finally {
             yield $this->zk->delete('/foo');
         }
+    }
+
+    public function testPing()
+    {
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect(
+            (new ZookeeperConfig)
+                ->sessionTimeout(1000)
+        );
+
+        yield new Delayed(2000);
+
+        $this->assertFalse(yield $zk->exists('/foo'));
+
+        yield $zk->close();
     }
 }

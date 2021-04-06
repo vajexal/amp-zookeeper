@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vajexal\AmpZookeeper;
 
 use Amp\Deferred;
+use Amp\Loop;
 use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
@@ -31,11 +32,18 @@ use function Amp\Socket\connect;
 
 class Zookeeper
 {
+    private const PING_XID               = -2;
+    private const PING_INTERVAL          = 1000;
+    private const MAX_SEND_PING_INTERVAL = 10000;
+
     /** @var Packet[] */
     private array           $queue;
-    private int             $xid = 0;
+    private int             $xid           = 0;
     private Socket          $socket;
     private LoggerInterface $logger;
+    private string          $pingWatcherId = '';
+    private int             $maxIdleTime;
+    private int             $lastSend;
 
     private function __construct()
     {
@@ -55,7 +63,6 @@ class Zookeeper
             $zk->logger = $config->getLogger();
 
             $connectStringParser = new ConnectStringParser($config->getConnectString());
-            // todo ping
 
             /** @var EncryptableSocket $socket */
             $zk->socket = yield connect($connectStringParser->getRandomServer()->getAuthority());
@@ -67,6 +74,7 @@ class Zookeeper
             yield $zk->waitForRecord(ConnectResponse::class);
             $zk->queue = [];
 
+            $zk->setupPing($config);
             $zk->listenForPackets();
 
             return $zk;
@@ -79,6 +87,11 @@ class Zookeeper
     public function close(): Promise
     {
         return call(function () {
+            if ($this->pingWatcherId) {
+                Loop::cancel($this->pingWatcherId);
+                $this->pingWatcherId = '';
+            }
+
             if ($this->socket->isClosed()) {
                 return;
             }
@@ -214,12 +227,39 @@ class Zookeeper
             yield $this->socket->write((string) $packet->getBB());
             $this->logger->debug('write: ' . $packet->getBB()->toHex());
 
+            $this->updateLastSend();
+
             $packet->deferred = new Deferred;
 
-            $this->queue[$this->xid++] = $packet;
+            if ($packet->requestHeader && $packet->requestHeader->getXid() >= 0) {
+                $this->queue[$this->xid++] = $packet;
+            }
 
             return $packet->deferred->promise();
         });
+    }
+
+    private function setupPing(ZookeeperConfig $config): void
+    {
+        $this->maxIdleTime = (int) ($config->getSessionTimeout() * 2 / 3);
+
+        $this->pingWatcherId = Loop::repeat(self::PING_INTERVAL, function () {
+            $idle = Loop::now() - $this->lastSend;
+
+            if ($idle > $this->maxIdleTime || $idle > self::MAX_SEND_PING_INTERVAL) {
+                $this->sendPing();
+            }
+        });
+
+        Loop::unreference($this->pingWatcherId);
+    }
+
+    private function sendPing(): Promise
+    {
+        $requestHeader = new RequestHeader(self::PING_XID, OpCode::PING);
+        $packet        = new Packet($requestHeader);
+
+        return $this->writePacket($packet);
     }
 
     /**
@@ -246,6 +286,11 @@ class Zookeeper
 
         $bb->readInt(); // todo read exact bytes from $data
         $replyHeader = ReplyHeader::deserialize($bb);
+
+        if ($replyHeader->getXid() === self::PING_XID) {
+            $this->logger->debug('Got ping response');
+            return;
+        }
 
         if (empty($this->queue[$replyHeader->getXid()])) {
             $this->logger->error(\sprintf('Could not find packet with xid %d', $replyHeader->getXid()));
@@ -290,5 +335,10 @@ class Zookeeper
 
             throw new KeeperException(\sprintf('Did not wait for %s', $recordClass));
         });
+    }
+
+    private function updateLastSend(): void
+    {
+        $this->lastSend = Loop::now();
     }
 }
