@@ -80,7 +80,7 @@ class ZookeeperTest extends AsyncTestCase
 
         yield new Delayed(2000);
 
-        $this->assertFalse(yield $zk->exists('/foo'));
+        yield $zk->sync('/foo');
 
         yield $zk->close();
     }

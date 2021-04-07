@@ -28,6 +28,8 @@ use Vajexal\AmpZookeeper\Proto\ReplyHeader;
 use Vajexal\AmpZookeeper\Proto\RequestHeader;
 use Vajexal\AmpZookeeper\Proto\SetDataRequest;
 use Vajexal\AmpZookeeper\Proto\SetDataResponse;
+use Vajexal\AmpZookeeper\Proto\SyncRequest;
+use Vajexal\AmpZookeeper\Proto\SyncResponse;
 use function Amp\call;
 use function Amp\Socket\connect;
 
@@ -220,6 +222,19 @@ class Zookeeper
             $response = yield $this->writePacket($packet);
 
             return $response->getChildren();
+        });
+    }
+
+    public function sync(string $path): Promise
+    {
+        return call(function () use ($path) {
+            PathUtils::validatePath($path);
+
+            $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
+            $request       = new SyncRequest($path);
+            $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+
+            yield $this->writePacket($packet);
         });
     }
 
