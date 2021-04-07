@@ -11,6 +11,7 @@ use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
 use LogicException;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Proto\ConnectRequest;
 use Vajexal\AmpZookeeper\Proto\ConnectResponse;
@@ -285,7 +286,11 @@ class Zookeeper
 
         $this->logger->debug('read: ' . $bb->toHex());
 
-        $bb->readInt(); // todo read exact bytes from $data
+        $len = $bb->readInt();
+        if ($len + 4 !== \count($bb)) {
+            throw new RuntimeException('I am too dump for now to read exact bytes from buffer');
+        }
+
         $replyHeader = ReplyHeader::deserialize($bb);
 
         if ($replyHeader->getXid() === self::PING_XID) {
@@ -330,7 +335,11 @@ class Zookeeper
 
                 $this->logger->debug('read: ' . $bb->toHex());
 
-                $bb->readInt(); // todo read exact bytes from $data
+                $len = $bb->readInt();
+                if ($len + 4 !== \count($bb)) {
+                    throw new RuntimeException('I am too dump for now to read exact bytes from buffer');
+                }
+
                 return $recordClass::deserialize($bb);
             }
 
