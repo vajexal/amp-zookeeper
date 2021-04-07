@@ -6,8 +6,8 @@ namespace Vajexal\AmpZookeeper;
 
 use Countable;
 use Iterator;
-use RuntimeException;
 use Stringable;
+use Vajexal\AmpZookeeper\Exception\ByteBufferException;
 
 class ByteBuffer implements Countable, Iterator, Stringable
 {
@@ -84,9 +84,15 @@ class ByteBuffer implements Countable, Iterator, Stringable
 
     public function readByte(): int
     {
-        $b = \unpack('C', $this->data[$this->position])[1];
+        $b = @\unpack('C', $this->data[$this->position]);
+
+        if ($b === false) {
+            throw ByteBufferException::invalidOperation();
+        }
+
         $this->position++;
-        return $b;
+
+        return $b[1];
     }
 
     public function readBool(): bool
@@ -96,7 +102,13 @@ class ByteBuffer implements Countable, Iterator, Stringable
 
     public function readInt(): int
     {
-        $i              = \unpack('N', \substr($this->data, $this->position, 4))[1];
+        $i = @\unpack('N', \substr($this->data, $this->position, 4));
+
+        if ($i === false) {
+            throw ByteBufferException::invalidOperation();
+        }
+
+        $i              = $i[1];
         $this->position += 4;
 
         if ($i > 0x7FFFFFFF) {
@@ -108,25 +120,43 @@ class ByteBuffer implements Countable, Iterator, Stringable
 
     public function readLong(): int
     {
-        $l              = \unpack('J', \substr($this->data, $this->position, 8))[1];
+        $l = @\unpack('J', \substr($this->data, $this->position, 8));
+
+        if ($l === false) {
+            throw ByteBufferException::invalidOperation();
+        }
+
         $this->position += 8;
-        return $l;
+
+        return $l[1];
     }
 
     public function readFloat(): float
     {
         // hope it's 32 bits
-        $f              = \unpack('G', \substr($this->data, $this->position, 4))[1];
+        $f = @\unpack('G', \substr($this->data, $this->position, 4));
+
+        if ($f === false) {
+            throw ByteBufferException::invalidOperation();
+        }
+
         $this->position += 4;
-        return $f;
+
+        return $f[1];
     }
 
     public function readDouble(): float
     {
         // hope it's 64 bits
-        $d              = \unpack('E', \substr($this->data, $this->position, 8))[1];
+        $d = @\unpack('E', \substr($this->data, $this->position, 8));
+
+        if ($d === false) {
+            throw ByteBufferException::invalidOperation();
+        }
+
         $this->position += 8;
-        return $d;
+
+        return $d[1];
     }
 
     public function readString(): string
@@ -138,6 +168,10 @@ class ByteBuffer implements Countable, Iterator, Stringable
         }
 
         $this->checkLength($len);
+
+        if ($this->position + $len > \strlen($this->data)) {
+            throw ByteBufferException::invalidOperation();
+        }
 
         $s              = \substr($this->data, $this->position, $len);
         $this->position += $len;
@@ -159,7 +193,7 @@ class ByteBuffer implements Countable, Iterator, Stringable
     private function checkLength(int $len): void
     {
         if ($len < 0 || $len > self::MAX_BUFFER_SIZE) {
-            throw new RuntimeException(\sprintf('Unreasonable length = %d', $len));
+            throw ByteBufferException::unreasonableLength($len);
         }
     }
 

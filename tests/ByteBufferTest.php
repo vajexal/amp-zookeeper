@@ -6,6 +6,7 @@ namespace Vajexal\AmpZookeeper\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Vajexal\AmpZookeeper\ByteBuffer;
+use Vajexal\AmpZookeeper\Exception\ByteBufferException;
 use Vajexal\AmpZookeeper\OpCode;
 use Vajexal\AmpZookeeper\Proto\RequestHeader;
 
@@ -77,5 +78,26 @@ class ByteBufferTest extends TestCase
         $this->assertEquals(-123, $bb->readLong());
         $this->assertEqualsWithDelta(-1.23, $bb->readFloat(), 0.0001);
         $this->assertEqualsWithDelta(-1.23, $bb->readDouble(), 0.0001);
+    }
+
+    public function testReadFromEmptyBuffer()
+    {
+        $this->expectExceptionObject(ByteBufferException::invalidOperation());
+
+        $bb = new ByteBuffer;
+
+        $bb->readInt();
+    }
+
+    public function testBrokenString()
+    {
+        $this->expectExceptionObject(ByteBufferException::invalidOperation());
+
+        $bb = new ByteBuffer;
+        $bb->writeString('foo');
+        $bb->rewind();
+        $bb->writeInt(10);
+
+        $bb->readString();
     }
 }
