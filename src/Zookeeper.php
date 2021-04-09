@@ -114,15 +114,13 @@ class Zookeeper
      */
     public function create(string $path, string $data): Promise
     {
-        return call(function () use ($path, $data) {
-            PathUtils::validatePath($path);
+        PathUtils::validatePath($path);
 
-            $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
-            $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), 0); // persistent mode
-            $packet        = new Packet($requestHeader, $request, CreateResponse::class);
+        $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
+        $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), 0); // persistent mode
+        $packet        = new Packet($requestHeader, $request, CreateResponse::class);
 
-            yield $this->writePacket($packet);
-        });
+        return $this->writePacket($packet);
     }
 
     /**
@@ -131,15 +129,13 @@ class Zookeeper
      */
     public function delete(string $path): Promise
     {
-        return call(function () use ($path) {
-            PathUtils::validatePath($path);
+        PathUtils::validatePath($path);
 
-            $requestHeader = new RequestHeader($this->xid, OpCode::DELETE);
-            $request       = new DeleteRequest($path, -1);
-            $packet        = new Packet($requestHeader, $request);
+        $requestHeader = new RequestHeader($this->xid, OpCode::DELETE);
+        $request       = new DeleteRequest($path, -1);
+        $packet        = new Packet($requestHeader, $request);
 
-            yield $this->writePacket($packet);
-        });
+        return $this->writePacket($packet);
     }
 
     /**
@@ -198,15 +194,13 @@ class Zookeeper
      */
     public function set(string $path, string $data): Promise
     {
-        return call(function () use ($path, $data) {
-            PathUtils::validatePath($path);
+        PathUtils::validatePath($path);
 
-            $requestHeader = new RequestHeader($this->xid, OpCode::SET_DATA);
-            $request       = new SetDataRequest($path, $data, -1);
-            $packet        = new Packet($requestHeader, $request, SetDataResponse::class);
+        $requestHeader = new RequestHeader($this->xid, OpCode::SET_DATA);
+        $request       = new SetDataRequest($path, $data, -1);
+        $packet        = new Packet($requestHeader, $request, SetDataResponse::class);
 
-            yield $this->writePacket($packet);
-        });
+        return $this->writePacket($packet);
     }
 
     public function getChildren(string $path): Promise
@@ -227,15 +221,13 @@ class Zookeeper
 
     public function sync(string $path): Promise
     {
-        return call(function () use ($path) {
-            PathUtils::validatePath($path);
+        PathUtils::validatePath($path);
 
-            $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
-            $request       = new SyncRequest($path);
-            $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+        $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
+        $request       = new SyncRequest($path);
+        $packet        = new Packet($requestHeader, $request, SyncResponse::class);
 
-            yield $this->writePacket($packet);
-        });
+        return $this->writePacket($packet);
     }
 
     private function writePacket(Packet $packet): Promise
