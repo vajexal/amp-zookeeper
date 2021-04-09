@@ -7,7 +7,10 @@ namespace Vajexal\AmpZookeeper\Tests;
 use Amp\Delayed;
 use Amp\PHPUnit\AsyncTestCase;
 use Vajexal\AmpZookeeper\Data\Stat;
+use Vajexal\AmpZookeeper\EventType;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
+use Vajexal\AmpZookeeper\KeeperState;
+use Vajexal\AmpZookeeper\Proto\WatcherEvent;
 use Vajexal\AmpZookeeper\Zookeeper;
 use Vajexal\AmpZookeeper\ZookeeperConfig;
 
@@ -86,6 +89,27 @@ class ZookeeperTest extends AsyncTestCase
         yield new Delayed(2000);
 
         yield $zk->sync('/foo');
+
+        yield $zk->close();
+    }
+
+    public function testWacher()
+    {
+        $watcher = $this->createCallback(1, function (WatcherEvent $event) {
+            $this->assertEquals(EventType::NODE_DELETED, $event->getType());
+            $this->assertEquals(KeeperState::SYNC_CONNECTED, $event->getState());
+            $this->assertEquals('/foo', $event->getPath());
+        });
+
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect(
+            (new ZookeeperConfig)
+                ->watcher($watcher)
+        );
+
+        yield $zk->create('/foo', 'bar');
+        yield $zk->get('/foo', true);
+        yield $zk->delete('/foo');
 
         yield $zk->close();
     }

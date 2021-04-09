@@ -9,10 +9,10 @@ use Amp\Loop;
 use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
+use Closure;
 use Psr\Log\LoggerInterface;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
-use Vajexal\AmpZookeeper\Exception\ZookeeperException;
 use Vajexal\AmpZookeeper\Proto\ConnectRequest;
 use Vajexal\AmpZookeeper\Proto\ConnectResponse;
 use Vajexal\AmpZookeeper\Proto\CreateRequest;
@@ -30,12 +30,15 @@ use Vajexal\AmpZookeeper\Proto\SetDataRequest;
 use Vajexal\AmpZookeeper\Proto\SetDataResponse;
 use Vajexal\AmpZookeeper\Proto\SyncRequest;
 use Vajexal\AmpZookeeper\Proto\SyncResponse;
+use Vajexal\AmpZookeeper\Proto\WatcherEvent;
 use function Amp\call;
 use function Amp\Socket\connect;
 
 class Zookeeper
 {
-    private const PING_XID               = -2;
+    private const NOTIFICATION_XID = -1;
+    private const PING_XID         = -2;
+
     private const MAX_SEND_PING_INTERVAL = 10000;
 
     /** @var Packet[] */
@@ -49,6 +52,7 @@ class Zookeeper
     private int             $lastSend              = 0;
     private string          $waitForRecordClass    = '';
     private ?Deferred       $waitForRecordDeferred = null;
+    private ?Closure        $watcher;
 
     private function __construct()
     {
@@ -65,16 +69,17 @@ class Zookeeper
         return call(function () use ($config) {
             $zk = new self;
 
-            $zk->logger = $config->getLogger();
+            $zk->logger  = $config->getLogger();
+            $zk->watcher = $config->getWatcher();
 
             $connectStringParser = new ConnectStringParser($config->getConnectString());
 
             /** @var EncryptableSocket $socket */
             $zk->socket = yield connect($connectStringParser->getRandomServer()->getAuthority());
 
-            $zk->sendConnectRequest($config);
+            yield $zk->sendConnectRequest($config);
 
-            $zk->listenForPackets();
+            Promise\rethrow($zk->listenForPackets());
 
             /** @var ConnectResponse $response */
             $response = yield $zk->waitForRecord(ConnectResponse::class);
@@ -141,15 +146,16 @@ class Zookeeper
 
     /**
      * @param string $path
+     * @param bool $watch
      * @return Promise<bool>
      */
-    public function exists(string $path): Promise
+    public function exists(string $path, bool $watch = false): Promise
     {
-        return call(function () use ($path) {
+        return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
             $requestHeader = new RequestHeader($this->xid, OpCode::EXISTS);
-            $request       = new ExistsRequest($path, false);
+            $request       = new ExistsRequest($path, $watch);
             $packet        = new Packet($requestHeader, $request, ExistsResponse::class);
 
             try {
@@ -169,15 +175,16 @@ class Zookeeper
 
     /**
      * @param string $path
+     * @param bool $watch
      * @return Promise<string>
      */
-    public function get(string $path): Promise
+    public function get(string $path, bool $watch = false): Promise
     {
-        return call(function () use ($path) {
+        return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_DATA);
-            $request       = new GetDataRequest($path, false);
+            $request       = new GetDataRequest($path, $watch);
             $packet        = new Packet($requestHeader, $request, GetDataResponse::class);
 
             /** @var GetDataResponse $response */
@@ -189,15 +196,16 @@ class Zookeeper
 
     /**
      * @param string $path
+     * @param bool $watch
      * @return Promise<Stat>
      */
-    public function stat(string $path): Promise
+    public function stat(string $path, bool $watch = false): Promise
     {
-        return call(function () use ($path) {
+        return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_DATA);
-            $request       = new GetDataRequest($path, false);
+            $request       = new GetDataRequest($path, $watch);
             $packet        = new Packet($requestHeader, $request, GetDataResponse::class);
 
             /** @var GetDataResponse $response */
@@ -223,13 +231,18 @@ class Zookeeper
         return $this->writePacket($packet);
     }
 
-    public function getChildren(string $path): Promise
+    /**
+     * @param string $path
+     * @param bool $watch
+     * @return Promise<array>
+     */
+    public function getChildren(string $path, bool $watch = false): Promise
     {
-        return call(function () use ($path) {
+        return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_CHILDREN);
-            $request       = new GetChildrenRequest($path, false);
+            $request       = new GetChildrenRequest($path, $watch);
             $packet        = new Packet($requestHeader, $request, GetChildrenResponse::class);
 
             /** @var GetChildrenResponse $response */
@@ -258,12 +271,12 @@ class Zookeeper
 
             $this->updateLastSend();
 
-            $packet->deferred = new Deferred;
-
-            if ($packet->requestHeader && $packet->requestHeader->getXid() >= 0) {
-                $this->queue[$this->xid++] = $packet;
+            if (!$packet->requestHeader || $packet->requestHeader->getXid() < 0) {
+                return null;
             }
 
+            $packet->deferred          = new Deferred;
+            $this->queue[$this->xid++] = $packet;
             return $packet->deferred->promise();
         });
     }
@@ -299,9 +312,6 @@ class Zookeeper
         return $this->writePacket($packet);
     }
 
-    /**
-     * @return Promise<void>
-     */
     private function listenForPackets(): Promise
     {
         return call(function () {
@@ -310,22 +320,21 @@ class Zookeeper
                     continue;
                 }
 
-                $this->readPacket($data);
+                $bb = new ByteBuffer($data);
+
+                $this->logger->debug('read: ' . $bb->toHex());
+
+                while ($bb->valid()) {
+                    $bb->readInt(); // len
+
+                    $this->readPacket($bb);
+                }
             }
         });
     }
 
-    private function readPacket(string $data): void
+    private function readPacket(ByteBuffer $bb): void
     {
-        $bb = new ByteBuffer($data);
-
-        $this->logger->debug('read: ' . $bb->toHex());
-
-        $len = $bb->readInt();
-        if ($len + 4 !== \count($bb)) {
-            throw ZookeeperException::tooDumpToReadExactBytes();
-        }
-
         if ($this->waitForRecordClass) {
             $response = \is_subclass_of($this->waitForRecordClass, Record::class) ?
                 ($this->waitForRecordClass)::deserialize($bb) :
@@ -339,6 +348,15 @@ class Zookeeper
 
         if ($replyHeader->getXid() === self::PING_XID) {
             $this->logger->debug('Got ping response');
+            return;
+        }
+
+        if ($replyHeader->getXid() === self::NOTIFICATION_XID) {
+            $event = WatcherEvent::deserialize($bb);
+            $this->logger->debug(\sprintf('Got notification %d, %d, %s', $event->getType(), $event->getState(), $event->getPath()));
+            if ($this->watcher) {
+                ($this->watcher)($event);
+            }
             return;
         }
 

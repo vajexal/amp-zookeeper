@@ -37,3 +37,34 @@ Loop::run(function () {
     yield $zk->close();
 });
 ```
+
+#### Watches
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Amp\Loop;
+use Vajexal\AmpZookeeper\Proto\WatcherEvent;
+use Vajexal\AmpZookeeper\Zookeeper;
+use Vajexal\AmpZookeeper\ZookeeperConfig;
+
+require_once 'vendor/autoload.php';
+
+Loop::run(function () {
+    /** @var Zookeeper $zk */
+    $zk = yield Zookeeper::connect(
+        (new ZookeeperConfig)
+            ->watcher(function (WatcherEvent $event) {
+                var_dump($event);
+            })
+    );
+
+    yield $zk->create('/foo', 'bar');
+    yield $zk->get('/foo', true);
+    yield $zk->delete('/foo');
+
+    yield $zk->close();
+});
+```

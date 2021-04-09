@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper;
 
+use Closure;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -12,6 +13,7 @@ class ZookeeperConfig
     private string          $connectString  = '127.0.0.1:2181';
     private int             $sessionTimeout = 5000;
     private LoggerInterface $logger;
+    private ?Closure        $watcher        = null;
 
     public function __construct()
     {
@@ -50,6 +52,18 @@ class ZookeeperConfig
     public function logger(LoggerInterface $logger): self
     {
         $this->logger = $logger;
+
+        return $this;
+    }
+
+    public function getWatcher(): ?Closure
+    {
+        return $this->watcher;
+    }
+
+    public function watcher(callable $watcher): self
+    {
+        $this->watcher = Closure::fromCallable($watcher);
 
         return $this;
     }
