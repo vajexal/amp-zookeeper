@@ -10,6 +10,7 @@ use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
 use Psr\Log\LoggerInterface;
+use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Exception\ZookeeperException;
 use Vajexal\AmpZookeeper\Proto\ConnectRequest;
@@ -168,10 +169,9 @@ class Zookeeper
 
     /**
      * @param string $path
-     * @param bool $watch
      * @return Promise<string>
      */
-    public function get(string $path, bool $watch = false): Promise
+    public function get(string $path): Promise
     {
         return call(function () use ($path) {
             PathUtils::validatePath($path);
@@ -184,6 +184,26 @@ class Zookeeper
             $response = yield $this->writePacket($packet);
 
             return $response->getData();
+        });
+    }
+
+    /**
+     * @param string $path
+     * @return Promise<Stat>
+     */
+    public function stat(string $path): Promise
+    {
+        return call(function () use ($path) {
+            PathUtils::validatePath($path);
+
+            $requestHeader = new RequestHeader($this->xid, OpCode::GET_DATA);
+            $request       = new GetDataRequest($path, false);
+            $packet        = new Packet($requestHeader, $request, GetDataResponse::class);
+
+            /** @var GetDataResponse $response */
+            $response = yield $this->writePacket($packet);
+
+            return $response->getStat();
         });
     }
 

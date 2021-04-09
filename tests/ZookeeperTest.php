@@ -6,6 +6,7 @@ namespace Vajexal\AmpZookeeper\Tests;
 
 use Amp\Delayed;
 use Amp\PHPUnit\AsyncTestCase;
+use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Zookeeper;
 use Vajexal\AmpZookeeper\ZookeeperConfig;
@@ -38,6 +39,10 @@ class ZookeeperTest extends AsyncTestCase
 
         yield $this->zk->create('/foo', 'bar');
         $this->assertEquals('bar', yield $this->zk->get('/foo'));
+
+        /** @var Stat $stat */
+        $stat = yield $this->zk->stat('/foo');
+        $this->assertEquals(3, $stat->getDataLength());
 
         yield $this->zk->set('/foo', 'baz');
         $this->assertEquals('baz', yield $this->zk->get('/foo'));
