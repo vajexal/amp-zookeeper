@@ -9,8 +9,6 @@ use Amp\Loop;
 use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
-use InvalidArgumentException;
-use LogicException;
 use Psr\Log\LoggerInterface;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Exception\ZookeeperException;
@@ -40,14 +38,16 @@ class Zookeeper
     private const MAX_SEND_PING_INTERVAL = 10000;
 
     /** @var Packet[] */
-    private array           $queue          = [];
-    private int             $xid            = 0;
+    private array           $queue                 = [];
+    private int             $xid                   = 0;
     private Socket          $socket;
     private LoggerInterface $logger;
-    private int             $sessionTimeout = 0;
-    private string          $pingWatcherId  = '';
-    private int             $maxIdleTime    = 0;
-    private int             $lastSend       = 0;
+    private int             $sessionTimeout        = 0;
+    private string          $pingWatcherId         = '';
+    private int             $maxIdleTime           = 0;
+    private int             $lastSend              = 0;
+    private string          $waitForRecordClass    = '';
+    private ?Deferred       $waitForRecordDeferred = null;
 
     private function __construct()
     {
@@ -71,16 +71,15 @@ class Zookeeper
             /** @var EncryptableSocket $socket */
             $zk->socket = yield connect($connectStringParser->getRandomServer()->getAuthority());
 
-            $request = new ConnectRequest(0, 0, $config->getSessionTimeout(), 0, \str_repeat("\0", 16));
-            $packet  = new Packet(null, $request);
+            $zk->sendConnectRequest($config);
 
-            $zk->writePacket($packet);
-            /** @var ConnectResponse $response */
-            $response           = yield $zk->waitForRecord(ConnectResponse::class);
-            $zk->sessionTimeout = $response->getTimeOut();
-
-            $zk->setupPing();
             $zk->listenForPackets();
+
+            /** @var ConnectResponse $response */
+            $response = yield $zk->waitForRecord(ConnectResponse::class);
+
+            $zk->sessionTimeout = $response->getTimeOut();
+            $zk->setupPing();
 
             return $zk;
         });
@@ -280,6 +279,14 @@ class Zookeeper
         return $this->writePacket($packet);
     }
 
+    private function sendConnectRequest(ZookeeperConfig $config): Promise
+    {
+        $request = new ConnectRequest(0, 0, $config->getSessionTimeout(), 0, \str_repeat("\0", 16));
+        $packet  = new Packet(null, $request);
+
+        return $this->writePacket($packet);
+    }
+
     /**
      * @return Promise<void>
      */
@@ -305,6 +312,15 @@ class Zookeeper
         $len = $bb->readInt();
         if ($len + 4 !== \count($bb)) {
             throw ZookeeperException::tooDumpToReadExactBytes();
+        }
+
+        if ($this->waitForRecordClass) {
+            $response = \is_subclass_of($this->waitForRecordClass, Record::class) ?
+                ($this->waitForRecordClass)::deserialize($bb) :
+                null;
+            $this->waitForRecordDeferred->resolve($response);
+            $this->waitForRecordClass = '';
+            return;
         }
 
         $replyHeader = ReplyHeader::deserialize($bb);
@@ -337,30 +353,10 @@ class Zookeeper
 
     private function waitForRecord(string $recordClass): Promise
     {
-        if (!\is_subclass_of($recordClass, Record::class)) {
-            throw new InvalidArgumentException(\sprintf('Expected instance of %s, got %s', Record::class, $recordClass));
-        }
+        $this->waitForRecordClass    = $recordClass;
+        $this->waitForRecordDeferred = new Deferred;
 
-        return call(function () use ($recordClass) {
-            while (($data = yield $this->socket->read()) !== null) {
-                if (!$data) {
-                    continue;
-                }
-
-                $bb = new ByteBuffer($data);
-
-                $this->logger->debug('read: ' . $bb->toHex());
-
-                $len = $bb->readInt();
-                if ($len + 4 !== \count($bb)) {
-                    throw ZookeeperException::tooDumpToReadExactBytes();
-                }
-
-                return $recordClass::deserialize($bb);
-            }
-
-            throw new LogicException(\sprintf('Did not wait for %s', $recordClass));
-        });
+        return $this->waitForRecordDeferred->promise();
     }
 
     private function updateLastSend(): void
