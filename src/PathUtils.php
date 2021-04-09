@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper;
 
-use InvalidArgumentException;
+use Vajexal\AmpZookeeper\Exception\PathUtilsException;
 
 class PathUtils
 {
     public static function validatePath(string $path): void
     {
         if (!$path) {
-            throw new InvalidArgumentException('Path length must be > 0');
+            throw PathUtilsException::emptyPath();
         }
 
         if (\mb_substr($path, 0, 1) !== '/') {
-            throw new InvalidArgumentException('Path must start with / character');
+            throw PathUtilsException::pathMustStartWithSlash();
         }
 
         if (\mb_strlen($path) === 1) {
@@ -23,13 +23,13 @@ class PathUtils
         }
 
         if (\mb_substr($path, -1) === '/') {
-            throw new InvalidArgumentException('Path must not end with / character');
+            throw PathUtilsException::pathMustNotEndWithSlash();
         }
 
         $chars = \preg_split('//u', $path, -1, PREG_SPLIT_NO_EMPTY);
 
         if (!$chars) {
-            throw new InvalidArgumentException('Invalid characters in path');
+            throw PathUtilsException::invalidCharInPath();
         }
 
         $reason = null;
@@ -65,7 +65,7 @@ class PathUtils
         }
 
         if ($reason !== null) {
-            throw new InvalidArgumentException(\sprintf('Invalid path string "%s" caused by %s', $path, $reason));
+            throw PathUtilsException::invalidPath($path, $reason);
         }
     }
 }

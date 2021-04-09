@@ -9,10 +9,11 @@ use Amp\Loop;
 use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
+use InvalidArgumentException;
 use LogicException;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
+use Vajexal\AmpZookeeper\Exception\ZookeeperException;
 use Vajexal\AmpZookeeper\Proto\ConnectRequest;
 use Vajexal\AmpZookeeper\Proto\ConnectResponse;
 use Vajexal\AmpZookeeper\Proto\CreateRequest;
@@ -303,7 +304,7 @@ class Zookeeper
 
         $len = $bb->readInt();
         if ($len + 4 !== \count($bb)) {
-            throw new RuntimeException('I am too dump for now to read exact bytes from buffer');
+            throw ZookeeperException::tooDumpToReadExactBytes();
         }
 
         $replyHeader = ReplyHeader::deserialize($bb);
@@ -337,7 +338,7 @@ class Zookeeper
     private function waitForRecord(string $recordClass): Promise
     {
         if (!\is_subclass_of($recordClass, Record::class)) {
-            throw new LogicException(\sprintf('Expected instance of %s, got %s', Record::class, $recordClass));
+            throw new InvalidArgumentException(\sprintf('Expected instance of %s, got %s', Record::class, $recordClass));
         }
 
         return call(function () use ($recordClass) {
@@ -352,13 +353,13 @@ class Zookeeper
 
                 $len = $bb->readInt();
                 if ($len + 4 !== \count($bb)) {
-                    throw new RuntimeException('I am too dump for now to read exact bytes from buffer');
+                    throw ZookeeperException::tooDumpToReadExactBytes();
                 }
 
                 return $recordClass::deserialize($bb);
             }
 
-            throw new KeeperException(\sprintf('Did not wait for %s', $recordClass));
+            throw new LogicException(\sprintf('Did not wait for %s', $recordClass));
         });
     }
 

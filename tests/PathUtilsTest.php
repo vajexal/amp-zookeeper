@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper\Tests;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Vajexal\AmpZookeeper\Exception\PathUtilsException;
 use Vajexal\AmpZookeeper\PathUtils;
 
 class PathUtilsTest extends TestCase
@@ -56,7 +56,7 @@ class PathUtilsTest extends TestCase
      */
     public function testInvalidPath(string $path)
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(PathUtilsException::class);
 
         PathUtils::validatePath($path);
     }

@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper;
 
-use InvalidArgumentException;
 use League\Uri\Uri;
-use LogicException;
+use Vajexal\AmpZookeeper\Exception\ConnectStringParserException;
 
 class ConnectStringParser
 {
@@ -21,7 +20,7 @@ class ConnectStringParser
     public function __construct(string $connectString)
     {
         if (!$connectString) {
-            throw new InvalidArgumentException('connect string must not be empty');
+            throw ConnectStringParserException::emptyConnectString();
         }
 
         $off = \mb_strpos($connectString, '/');
@@ -54,7 +53,7 @@ class ConnectStringParser
         }
 
         if (!$this->serverAddresses) {
-            throw new LogicException('servers list must not be empty');
+            throw ConnectStringParserException::emptyServersList();
         }
     }
 

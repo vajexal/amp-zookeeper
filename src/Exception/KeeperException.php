@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper\Exception;
 
-use Exception;
 use Throwable;
 
-class KeeperException extends Exception
+class KeeperException extends ZookeeperException
 {
     public const OK                               = 0;
     public const SYSTEM_ERROR                     = -1;

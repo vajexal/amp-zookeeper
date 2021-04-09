@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Vajexal\AmpZookeeper\Exception;
 
-use Exception;
-
-class ByteBufferException extends Exception
+class ByteBufferException extends ZookeeperException
 {
     public const INVALID_OPERATION_CODE = 0;
     public const INVALID_LENGTH_CODE    = 1;
