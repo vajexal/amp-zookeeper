@@ -135,7 +135,7 @@ class ZookeeperTest extends AsyncTestCase
         try {
             yield $zk->create('/foo', 'bar');
             yield $zk->get('/foo', true);
-            yield $zk->removeAllWatches('/foo');
+            yield $zk->removeWatches('/foo');
             yield $zk->delete('/foo');
         } finally {
             yield $zk->close();

@@ -265,7 +265,7 @@ class Zookeeper
         return $this->writePacket($packet);
     }
 
-    public function removeAllWatches(string $path, int $watcherType = WatcherType::ANY): Promise
+    public function removeWatches(string $path, int $watcherType = WatcherType::ANY): Promise
     {
         if (!\in_array($watcherType, WatcherType::TYPES, true)) {
             throw new InvalidArgumentException('Invalid watcher type');
