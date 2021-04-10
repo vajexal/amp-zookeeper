@@ -93,7 +93,7 @@ class ZookeeperTest extends AsyncTestCase
         yield $zk->close();
     }
 
-    public function testWacher()
+    public function testWatches()
     {
         $watcher = $this->createCallback(1, function (WatcherEvent $event) {
             $this->assertEquals(EventType::NODE_DELETED, $event->getType());
@@ -109,6 +109,24 @@ class ZookeeperTest extends AsyncTestCase
 
         yield $zk->create('/foo', 'bar');
         yield $zk->get('/foo', true);
+        yield $zk->delete('/foo');
+
+        yield $zk->close();
+    }
+
+    public function testRemoveWatches()
+    {
+        $watcher = $this->createCallback(0);
+
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect(
+            (new ZookeeperConfig)
+                ->watcher($watcher)
+        );
+
+        yield $zk->create('/foo', 'bar');
+        yield $zk->get('/foo', true);
+        yield $zk->removeAllWatches('/foo');
         yield $zk->delete('/foo');
 
         yield $zk->close();

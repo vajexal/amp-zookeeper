@@ -10,6 +10,7 @@ use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
 use Closure;
+use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
@@ -24,6 +25,7 @@ use Vajexal\AmpZookeeper\Proto\GetChildrenRequest;
 use Vajexal\AmpZookeeper\Proto\GetChildrenResponse;
 use Vajexal\AmpZookeeper\Proto\GetDataRequest;
 use Vajexal\AmpZookeeper\Proto\GetDataResponse;
+use Vajexal\AmpZookeeper\Proto\RemoveWatchesRequest;
 use Vajexal\AmpZookeeper\Proto\ReplyHeader;
 use Vajexal\AmpZookeeper\Proto\RequestHeader;
 use Vajexal\AmpZookeeper\Proto\SetDataRequest;
@@ -259,6 +261,21 @@ class Zookeeper
         $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
         $request       = new SyncRequest($path);
         $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+
+        return $this->writePacket($packet);
+    }
+
+    public function removeAllWatches(string $path, int $watcherType = WatcherType::ANY): Promise
+    {
+        if (!\in_array($watcherType, WatcherType::TYPES, true)) {
+            throw new InvalidArgumentException('Invalid watcher type');
+        }
+
+        PathUtils::validatePath($path);
+
+        $requestHeader = new RequestHeader($this->xid, OpCode::REMOVE_WATCHES);
+        $request       = new RemoveWatchesRequest($path, $watcherType);
+        $packet        = new Packet($requestHeader, $request);
 
         return $this->writePacket($packet);
     }
