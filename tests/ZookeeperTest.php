@@ -6,6 +6,7 @@ namespace Vajexal\AmpZookeeper\Tests;
 
 use Amp\Delayed;
 use Amp\PHPUnit\AsyncTestCase;
+use Vajexal\AmpZookeeper\CreateMode;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\EventType;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
@@ -25,6 +26,7 @@ class ZookeeperTest extends AsyncTestCase
 
     public function testZookeeper()
     {
+        /** @var Zookeeper $zk */
         $zk = yield Zookeeper::connect();
 
         try {
@@ -56,6 +58,7 @@ class ZookeeperTest extends AsyncTestCase
     {
         $this->expectExceptionObject(new KeeperException('NoNode', KeeperException::NO_NODE));
 
+        /** @var Zookeeper $zk */
         $zk = yield Zookeeper::connect();
 
         try {
@@ -69,6 +72,7 @@ class ZookeeperTest extends AsyncTestCase
     {
         $this->expectExceptionObject(new KeeperException('NodeExists', KeeperException::NODE_EXISTS));
 
+        /** @var Zookeeper $zk */
         $zk = yield Zookeeper::connect();
 
         try {
@@ -139,6 +143,29 @@ class ZookeeperTest extends AsyncTestCase
             yield $zk->delete('/foo');
         } finally {
             yield $zk->close();
+        }
+    }
+
+    public function testEphemeralNode()
+    {
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect();
+
+        try {
+            yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL);
+
+            $this->assertEquals(['/foo'], yield $zk->getEphemerals());
+        } finally {
+            yield $zk->close();
+        }
+
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect();
+
+        try {
+            $this->assertFalse(yield $zk->exists('/foo'));
+        } finally {
+            $zk->close();
         }
     }
 }

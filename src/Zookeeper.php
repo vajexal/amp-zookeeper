@@ -25,6 +25,8 @@ use Vajexal\AmpZookeeper\Proto\GetChildrenRequest;
 use Vajexal\AmpZookeeper\Proto\GetChildrenResponse;
 use Vajexal\AmpZookeeper\Proto\GetDataRequest;
 use Vajexal\AmpZookeeper\Proto\GetDataResponse;
+use Vajexal\AmpZookeeper\Proto\GetEphemeralsRequest;
+use Vajexal\AmpZookeeper\Proto\GetEphemeralsResponse;
 use Vajexal\AmpZookeeper\Proto\RemoveWatchesRequest;
 use Vajexal\AmpZookeeper\Proto\ReplyHeader;
 use Vajexal\AmpZookeeper\Proto\RequestHeader;
@@ -118,14 +120,19 @@ class Zookeeper
     /**
      * @param string $path
      * @param string $data
+     * @param int $createMode
      * @return Promise<void>
      */
-    public function create(string $path, string $data): Promise
+    public function create(string $path, string $data, int $createMode = CreateMode::PERSISTENT): Promise
     {
+        if (!\in_array($createMode, CreateMode::MODES, true)) {
+            throw new InvalidArgumentException('Invalid create mode');
+        }
+
         PathUtils::validatePath($path);
 
         $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
-        $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), 0); // persistent mode
+        $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), $createMode);
         $packet        = new Packet($requestHeader, $request, CreateResponse::class);
 
         return $this->writePacket($packet);
@@ -278,6 +285,22 @@ class Zookeeper
         $packet        = new Packet($requestHeader, $request);
 
         return $this->writePacket($packet);
+    }
+
+    public function getEphemerals(string $prefixPath = '/'): Promise
+    {
+        return call(function () use ($prefixPath) {
+            PathUtils::validatePath($prefixPath);
+
+            $requestHeader = new RequestHeader($this->xid, OpCode::GET_EPHEMERALS);
+            $request       = new GetEphemeralsRequest($prefixPath);
+            $packet        = new Packet($requestHeader, $request, GetEphemeralsResponse::class);
+
+            /** @var GetEphemeralsResponse $response */
+            $response = yield $this->writePacket($packet);
+
+            return $response->getEphemerals();
+        });
     }
 
     private function writePacket(Packet $packet): Promise
