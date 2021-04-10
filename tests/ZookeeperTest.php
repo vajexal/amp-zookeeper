@@ -16,63 +16,67 @@ use Vajexal\AmpZookeeper\ZookeeperConfig;
 
 class ZookeeperTest extends AsyncTestCase
 {
-    private Zookeeper $zk;
-
-    protected function setUpAsync()
+    protected function setUp(): void
     {
-        parent::setUpAsync();
+        parent::setUp();
 
         $this->setTimeout(5000);
-
-        $this->zk = yield Zookeeper::connect();
-    }
-
-    protected function tearDownAsync()
-    {
-        parent::tearDownAsync();
-
-        yield $this->zk->close();
     }
 
     public function testZookeeper()
     {
-        if (yield $this->zk->exists('/foo')) {
-            yield $this->zk->delete('/foo');
+        $zk = yield Zookeeper::connect();
+
+        try {
+            if (yield $zk->exists('/foo')) {
+                yield $zk->delete('/foo');
+            }
+
+            yield $zk->create('/foo', 'bar');
+            $this->assertEquals('bar', yield $zk->get('/foo'));
+
+            /** @var Stat $stat */
+            $stat = yield $zk->stat('/foo');
+            $this->assertEquals(3, $stat->getDataLength());
+
+            yield $zk->set('/foo', 'baz');
+            $this->assertEquals('baz', yield $zk->get('/foo'));
+
+            $this->assertContains('foo', yield $zk->getChildren('/'));
+
+            $this->assertTrue(yield $zk->exists('/foo'));
+            yield $zk->delete('/foo');
+            $this->assertFalse(yield $zk->exists('/foo'));
+        } finally {
+            yield $zk->close();
         }
-
-        yield $this->zk->create('/foo', 'bar');
-        $this->assertEquals('bar', yield $this->zk->get('/foo'));
-
-        /** @var Stat $stat */
-        $stat = yield $this->zk->stat('/foo');
-        $this->assertEquals(3, $stat->getDataLength());
-
-        yield $this->zk->set('/foo', 'baz');
-        $this->assertEquals('baz', yield $this->zk->get('/foo'));
-
-        $this->assertContains('foo', yield $this->zk->getChildren('/'));
-
-        $this->assertTrue(yield $this->zk->exists('/foo'));
-        yield $this->zk->delete('/foo');
-        $this->assertFalse(yield $this->zk->exists('/foo'));
     }
 
     public function testSetEmptyNode()
     {
         $this->expectExceptionObject(new KeeperException('NoNode', KeeperException::NO_NODE));
 
-        yield $this->zk->set('/foo', 'bar');
+        $zk = yield Zookeeper::connect();
+
+        try {
+            yield $zk->set('/foo', 'bar');
+        } finally {
+            yield $zk->close();
+        }
     }
 
     public function testCreateWhenNodeExists()
     {
         $this->expectExceptionObject(new KeeperException('NodeExists', KeeperException::NODE_EXISTS));
 
+        $zk = yield Zookeeper::connect();
+
         try {
-            yield $this->zk->create('/foo', 'bar');
-            yield $this->zk->create('/foo', 'bar');
+            yield $zk->create('/foo', 'bar');
+            yield $zk->create('/foo', 'bar');
         } finally {
-            yield $this->zk->delete('/foo');
+            yield $zk->delete('/foo');
+            yield $zk->close();
         }
     }
 
@@ -84,13 +88,15 @@ class ZookeeperTest extends AsyncTestCase
                 ->sessionTimeout(1000)
         );
 
-        $this->assertEquals(1000, $zk->getSessionTimeout());
+        try {
+            $this->assertEquals(1000, $zk->getSessionTimeout());
 
-        yield new Delayed(2000);
+            yield new Delayed(2000);
 
-        yield $zk->sync('/foo');
-
-        yield $zk->close();
+            yield $zk->sync('/foo');
+        } finally {
+            yield $zk->close();
+        }
     }
 
     public function testWatches()
@@ -107,11 +113,13 @@ class ZookeeperTest extends AsyncTestCase
                 ->watcher($watcher)
         );
 
-        yield $zk->create('/foo', 'bar');
-        yield $zk->get('/foo', true);
-        yield $zk->delete('/foo');
-
-        yield $zk->close();
+        try {
+            yield $zk->create('/foo', 'bar');
+            yield $zk->get('/foo', true);
+            yield $zk->delete('/foo');
+        } finally {
+            yield $zk->close();
+        }
     }
 
     public function testRemoveWatches()
@@ -124,11 +132,13 @@ class ZookeeperTest extends AsyncTestCase
                 ->watcher($watcher)
         );
 
-        yield $zk->create('/foo', 'bar');
-        yield $zk->get('/foo', true);
-        yield $zk->removeAllWatches('/foo');
-        yield $zk->delete('/foo');
-
-        yield $zk->close();
+        try {
+            yield $zk->create('/foo', 'bar');
+            yield $zk->get('/foo', true);
+            yield $zk->removeAllWatches('/foo');
+            yield $zk->delete('/foo');
+        } finally {
+            yield $zk->close();
+        }
     }
 }
