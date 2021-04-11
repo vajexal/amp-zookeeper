@@ -8,8 +8,12 @@ use Vajexal\AmpZookeeper\Exception\PathUtilsException;
 
 class PathUtils
 {
-    public static function validatePath(string $path): void
+    public static function validatePath(string $path, bool $isSequential = false): void
     {
+        if ($isSequential) {
+            $path .= '1';
+        }
+
         if (!$path) {
             throw PathUtilsException::emptyPath();
         }

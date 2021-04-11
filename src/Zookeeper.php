@@ -10,7 +10,6 @@ use Amp\Promise;
 use Amp\Socket\EncryptableSocket;
 use Amp\Socket\Socket;
 use Closure;
-use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
@@ -125,11 +124,8 @@ class Zookeeper
      */
     public function create(string $path, string $data, int $createMode = CreateMode::PERSISTENT): Promise
     {
-        if (!\in_array($createMode, CreateMode::MODES, true)) {
-            throw new InvalidArgumentException('Invalid create mode');
-        }
-
-        PathUtils::validatePath($path);
+        CreateMode::validate($createMode);
+        PathUtils::validatePath($path, CreateMode::isSequential($createMode));
 
         $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
         $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), $createMode);
@@ -274,10 +270,7 @@ class Zookeeper
 
     public function removeWatches(string $path, int $watcherType = WatcherType::ANY): Promise
     {
-        if (!\in_array($watcherType, WatcherType::TYPES, true)) {
-            throw new InvalidArgumentException('Invalid watcher type');
-        }
-
+        WatcherType::validate($watcherType);
         PathUtils::validatePath($path);
 
         $requestHeader = new RequestHeader($this->xid, OpCode::REMOVE_WATCHES);

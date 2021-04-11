@@ -97,3 +97,28 @@ Loop::run(function () {
     $zk->close();
 });
 ```
+
+#### Sequential Nodes
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Amp\Loop;
+use Vajexal\AmpZookeeper\CreateMode;
+use Vajexal\AmpZookeeper\Zookeeper;
+
+require_once 'vendor/autoload.php';
+
+Loop::run(function () {
+    /** @var Zookeeper $zk */
+    $zk = yield Zookeeper::connect();
+
+    yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
+
+    var_dump(yield $zk->getChildren('/'));
+
+    yield $zk->close();
+});
+```

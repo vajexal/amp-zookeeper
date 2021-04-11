@@ -168,4 +168,20 @@ class ZookeeperTest extends AsyncTestCase
             $zk->close();
         }
     }
+
+    public function testSequentialNode()
+    {
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect();
+
+        try {
+            yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
+
+            $nodes = yield $zk->getChildren('/');
+            $nodes = \array_filter($nodes, fn (string $node) => \preg_match('/^foo\d{10}$/', $node));
+            $this->assertNotEmpty($nodes);
+        } finally {
+            yield $zk->close();
+        }
+    }
 }
