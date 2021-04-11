@@ -56,6 +56,7 @@ class Zookeeper
     private string          $waitForRecordClass    = '';
     private ?Deferred       $waitForRecordDeferred = null;
     private ?Closure        $watcher;
+    private string          $chrootPath            = '';
 
     private function __construct()
     {
@@ -76,6 +77,7 @@ class Zookeeper
             $zk->watcher = $config->getWatcher();
 
             $connectStringParser = new ConnectStringParser($config->getConnectString());
+            $zk->chrootPath      = $connectStringParser->getChrootPath();
 
             /** @var EncryptableSocket $socket */
             $zk->socket = yield connect($connectStringParser->getRandomServer()->getAuthority());
@@ -120,18 +122,29 @@ class Zookeeper
      * @param string $path
      * @param string $data
      * @param int $createMode
-     * @return Promise<void>
+     * @return Promise<string>
      */
     public function create(string $path, string $data, int $createMode = CreateMode::PERSISTENT): Promise
     {
-        CreateMode::validate($createMode);
-        PathUtils::validatePath($path, CreateMode::isSequential($createMode));
+        return call(function () use ($path, $data, $createMode) {
+            CreateMode::validate($createMode);
+            PathUtils::validatePath($path, CreateMode::isSequential($createMode));
 
-        $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
-        $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), $createMode);
-        $packet        = new Packet($requestHeader, $request, CreateResponse::class);
+            $serverPath = $this->prependChroot($path);
 
-        return $this->writePacket($packet);
+            $requestHeader = new RequestHeader($this->xid, OpCode::CREATE);
+            $request       = new CreateRequest($serverPath, $data, Ids::openACLUnsafe(), $createMode);
+            $packet        = new Packet($requestHeader, $request, CreateResponse::class);
+
+            try {
+                /** @var CreateResponse $response */
+                $response = yield $this->writePacket($packet);
+
+                return $this->chrootPath ? \mb_substr($response->getPath(), \mb_strlen($this->chrootPath)) : $response->getPath();
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
     }
 
     /**
@@ -140,13 +153,21 @@ class Zookeeper
      */
     public function delete(string $path): Promise
     {
-        PathUtils::validatePath($path);
+        return call(function () use ($path) {
+            PathUtils::validatePath($path);
 
-        $requestHeader = new RequestHeader($this->xid, OpCode::DELETE);
-        $request       = new DeleteRequest($path, -1);
-        $packet        = new Packet($requestHeader, $request);
+            $serverPath = $path === '/' ? $path : $this->prependChroot($path);
 
-        return $this->writePacket($packet);
+            $requestHeader = new RequestHeader($this->xid, OpCode::DELETE);
+            $request       = new DeleteRequest($serverPath, -1);
+            $packet        = new Packet($requestHeader, $request);
+
+            try {
+                yield $this->writePacket($packet);
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
     }
 
     /**
@@ -159,8 +180,10 @@ class Zookeeper
         return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
+            $serverPath = $this->prependChroot($path);
+
             $requestHeader = new RequestHeader($this->xid, OpCode::EXISTS);
-            $request       = new ExistsRequest($path, $watch);
+            $request       = new ExistsRequest($serverPath, $watch);
             $packet        = new Packet($requestHeader, $request, ExistsResponse::class);
 
             try {
@@ -173,7 +196,7 @@ class Zookeeper
                     return false;
                 }
 
-                throw $e;
+                throw $e->withPath($path);
             }
         });
     }
@@ -188,14 +211,20 @@ class Zookeeper
         return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
+            $serverPath = $this->prependChroot($path);
+
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_DATA);
-            $request       = new GetDataRequest($path, $watch);
+            $request       = new GetDataRequest($serverPath, $watch);
             $packet        = new Packet($requestHeader, $request, GetDataResponse::class);
 
-            /** @var GetDataResponse $response */
-            $response = yield $this->writePacket($packet);
+            try {
+                /** @var GetDataResponse $response */
+                $response = yield $this->writePacket($packet);
 
-            return $response->getData();
+                return $response->getData();
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
         });
     }
 
@@ -209,14 +238,20 @@ class Zookeeper
         return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
+            $serverPath = $this->prependChroot($path);
+
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_DATA);
-            $request       = new GetDataRequest($path, $watch);
+            $request       = new GetDataRequest($serverPath, $watch);
             $packet        = new Packet($requestHeader, $request, GetDataResponse::class);
 
-            /** @var GetDataResponse $response */
-            $response = yield $this->writePacket($packet);
+            try {
+                /** @var GetDataResponse $response */
+                $response = yield $this->writePacket($packet);
 
-            return $response->getStat();
+                return $response->getStat();
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
         });
     }
 
@@ -227,13 +262,21 @@ class Zookeeper
      */
     public function set(string $path, string $data): Promise
     {
-        PathUtils::validatePath($path);
+        return call(function () use ($path, $data) {
+            PathUtils::validatePath($path);
 
-        $requestHeader = new RequestHeader($this->xid, OpCode::SET_DATA);
-        $request       = new SetDataRequest($path, $data, -1);
-        $packet        = new Packet($requestHeader, $request, SetDataResponse::class);
+            $serverPath = $this->prependChroot($path);
 
-        return $this->writePacket($packet);
+            $requestHeader = new RequestHeader($this->xid, OpCode::SET_DATA);
+            $request       = new SetDataRequest($serverPath, $data, -1);
+            $packet        = new Packet($requestHeader, $request, SetDataResponse::class);
+
+            try {
+                yield $this->writePacket($packet);
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
     }
 
     /**
@@ -246,38 +289,60 @@ class Zookeeper
         return call(function () use ($path, $watch) {
             PathUtils::validatePath($path);
 
+            $serverPath = $this->prependChroot($path);
+
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_CHILDREN);
-            $request       = new GetChildrenRequest($path, $watch);
+            $request       = new GetChildrenRequest($serverPath, $watch);
             $packet        = new Packet($requestHeader, $request, GetChildrenResponse::class);
 
-            /** @var GetChildrenResponse $response */
-            $response = yield $this->writePacket($packet);
+            try {
+                /** @var GetChildrenResponse $response */
+                $response = yield $this->writePacket($packet);
 
-            return $response->getChildren();
+                return $response->getChildren();
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
         });
     }
 
     public function sync(string $path): Promise
     {
-        PathUtils::validatePath($path);
+        return call(function () use ($path) {
+            PathUtils::validatePath($path);
 
-        $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
-        $request       = new SyncRequest($path);
-        $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+            $serverPath = $this->prependChroot($path);
 
-        return $this->writePacket($packet);
+            $requestHeader = new RequestHeader($this->xid, OpCode::SYNC);
+            $request       = new SyncRequest($serverPath);
+            $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+
+            try {
+                yield $this->writePacket($packet);
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
     }
 
     public function removeWatches(string $path, int $watcherType = WatcherType::ANY): Promise
     {
-        WatcherType::validate($watcherType);
-        PathUtils::validatePath($path);
+        return call(function () use ($path, $watcherType) {
+            WatcherType::validate($watcherType);
+            PathUtils::validatePath($path);
 
-        $requestHeader = new RequestHeader($this->xid, OpCode::REMOVE_WATCHES);
-        $request       = new RemoveWatchesRequest($path, $watcherType);
-        $packet        = new Packet($requestHeader, $request);
+            $serverPath = $this->prependChroot($path);
 
-        return $this->writePacket($packet);
+            $requestHeader = new RequestHeader($this->xid, OpCode::REMOVE_WATCHES);
+            $request       = new RemoveWatchesRequest($serverPath, $watcherType);
+            $packet        = new Packet($requestHeader, $request);
+
+            try {
+                yield $this->writePacket($packet);
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
     }
 
     public function getEphemerals(string $prefixPath = '/'): Promise
@@ -285,14 +350,20 @@ class Zookeeper
         return call(function () use ($prefixPath) {
             PathUtils::validatePath($prefixPath);
 
+            $serverPath = $this->prependChroot($prefixPath);
+
             $requestHeader = new RequestHeader($this->xid, OpCode::GET_EPHEMERALS);
-            $request       = new GetEphemeralsRequest($prefixPath);
+            $request       = new GetEphemeralsRequest($serverPath);
             $packet        = new Packet($requestHeader, $request, GetEphemeralsResponse::class);
 
-            /** @var GetEphemeralsResponse $response */
-            $response = yield $this->writePacket($packet);
+            try {
+                /** @var GetEphemeralsResponse $response */
+                $response = yield $this->writePacket($packet);
 
-            return $response->getEphemerals();
+                return $response->getEphemerals();
+            } catch (KeeperException $e) {
+                throw $e->withPath($prefixPath);
+            }
         });
     }
 
@@ -425,6 +496,19 @@ class Zookeeper
     private function updateLastSend(): void
     {
         $this->lastSend = Loop::now();
+    }
+
+    private function prependChroot(string $path): string
+    {
+        if (!$this->chrootPath) {
+            return $path;
+        }
+
+        if (\mb_strlen($path) === 1) {
+            return $this->chrootPath;
+        }
+
+        return $this->chrootPath . $path;
     }
 
     public function getSessionTimeout(): int

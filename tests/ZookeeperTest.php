@@ -184,4 +184,27 @@ class ZookeeperTest extends AsyncTestCase
             yield $zk->close();
         }
     }
+
+    public function testChrootPath()
+    {
+        /** @var Zookeeper $chrootedZk */
+        $chrootedZk = yield Zookeeper::connect(
+            (new ZookeeperConfig)
+                ->connectString('127.0.0.1/foo')
+        );
+        /** @var Zookeeper $zk */
+        $zk = yield Zookeeper::connect();
+
+        try {
+            yield $zk->create('/foo', 'bar');
+            yield $chrootedZk->create('/bar', 'baz', CreateMode::EPHEMERAL);
+
+            $this->assertEquals(['bar'], yield $zk->getChildren('/foo'));
+
+            yield $chrootedZk->close();
+            yield $zk->delete('/foo');
+        } finally {
+            yield $zk->close();
+        }
+    }
 }

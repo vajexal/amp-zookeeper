@@ -94,4 +94,11 @@ class KeeperException extends ZookeeperException
     {
         return $this->path;
     }
+
+    public function withPath(string $path): self
+    {
+        $this->path = $path;
+
+        return $this;
+    }
 }
