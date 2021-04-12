@@ -46,7 +46,7 @@ class ByteBufferTest extends TestCase
     {
         $bb = new ByteBuffer;
 
-        $requestHeader = new RequestHeader(1, OpCode::GET_DATA);
+        $requestHeader = new RequestHeader(OpCode::GET_DATA, 1);
 
         $bb->writeInt(-1);
         $bb->writeRecord($requestHeader);

@@ -9,10 +9,10 @@ use Vajexal\AmpZookeeper\Record;
 
 class RequestHeader implements Record
 {
-    private int $xid;
     private int $type;
+    private int $xid;
 
-    public function __construct(int $xid, int $type)
+    public function __construct(int $type, int $xid = 0)
     {
         $this->type = $type;
         $this->xid  = $xid;
@@ -26,10 +26,18 @@ class RequestHeader implements Record
 
     public static function deserialize(ByteBuffer $bb): self
     {
+        $xid  = $bb->readInt();
+        $type = $bb->readInt();
+
         return new self(
-            $bb->readInt(),
-            $bb->readInt(),
+            $type,
+            $xid,
         );
+    }
+
+    public function getType(): int
+    {
+        return $this->type;
     }
 
     public function getXid(): int
@@ -37,8 +45,8 @@ class RequestHeader implements Record
         return $this->xid;
     }
 
-    public function getType(): int
+    public function setXid(int $xid): void
     {
-        return $this->type;
+        $this->xid = $xid;
     }
 }
