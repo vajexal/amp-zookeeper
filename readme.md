@@ -17,12 +17,13 @@ declare(strict_types=1);
 
 use Amp\Loop;
 use Vajexal\AmpZookeeper\Zookeeper;
+use Vajexal\AmpZookeeper\ZookeeperConnector;
 
 require_once 'vendor/autoload.php';
 
 Loop::run(function () {
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect();
+    $zk = yield (new ZookeeperConnector)->connect();
 
     yield $zk->create('/foo', 'bar');
     var_dump(yield $zk->get('/foo'));
@@ -48,18 +49,17 @@ declare(strict_types=1);
 use Amp\Loop;
 use Vajexal\AmpZookeeper\Proto\WatcherEvent;
 use Vajexal\AmpZookeeper\Zookeeper;
-use Vajexal\AmpZookeeper\ZookeeperConfig;
+use Vajexal\AmpZookeeper\ZookeeperConnector;
 
 require_once 'vendor/autoload.php';
 
 Loop::run(function () {
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect(
-        (new ZookeeperConfig)
-            ->watcher(function (WatcherEvent $event) {
-                var_dump($event);
-            })
-    );
+    $zk = yield (new ZookeeperConnector)
+        ->watcher(function (WatcherEvent $event) {
+            var_dump($event);
+        })
+        ->connect();
 
     yield $zk->create('/foo', 'bar');
     yield $zk->get('/foo', true);
@@ -79,19 +79,20 @@ declare(strict_types=1);
 use Amp\Loop;
 use Vajexal\AmpZookeeper\CreateMode;
 use Vajexal\AmpZookeeper\Zookeeper;
+use Vajexal\AmpZookeeper\ZookeeperConnector;
 
 require_once 'vendor/autoload.php';
 
 Loop::run(function () {
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect();
+    $zk = yield (new ZookeeperConnector)->connect();
 
     yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL);
     var_dump(yield $zk->getEphemerals());
     yield $zk->close();
 
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect();
+    $zk = yield (new ZookeeperConnector)->connect();
 
     var_dump(yield $zk->exists('/foo'));
     $zk->close();
@@ -108,12 +109,13 @@ declare(strict_types=1);
 use Amp\Loop;
 use Vajexal\AmpZookeeper\CreateMode;
 use Vajexal\AmpZookeeper\Zookeeper;
+use Vajexal\AmpZookeeper\ZookeeperConnector;
 
 require_once 'vendor/autoload.php';
 
 Loop::run(function () {
     /** @var Zookeeper $zk */
-    $zk = yield Zookeeper::connect();
+    $zk = yield (new ZookeeperConnector)->connect();
 
     yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
 

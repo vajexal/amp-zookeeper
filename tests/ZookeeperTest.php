@@ -13,7 +13,7 @@ use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\KeeperState;
 use Vajexal\AmpZookeeper\Proto\WatcherEvent;
 use Vajexal\AmpZookeeper\Zookeeper;
-use Vajexal\AmpZookeeper\ZookeeperConfig;
+use Vajexal\AmpZookeeper\ZookeeperConnector;
 
 class ZookeeperTest extends AsyncTestCase
 {
@@ -27,7 +27,7 @@ class ZookeeperTest extends AsyncTestCase
     public function testZookeeper()
     {
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             if (yield $zk->exists('/foo')) {
@@ -59,7 +59,7 @@ class ZookeeperTest extends AsyncTestCase
         $this->expectExceptionObject(new KeeperException('NoNode', KeeperException::NO_NODE));
 
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             yield $zk->set('/foo', 'bar');
@@ -73,7 +73,7 @@ class ZookeeperTest extends AsyncTestCase
         $this->expectExceptionObject(new KeeperException('NodeExists', KeeperException::NODE_EXISTS));
 
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             yield $zk->create('/foo', 'bar');
@@ -87,10 +87,9 @@ class ZookeeperTest extends AsyncTestCase
     public function testPing()
     {
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect(
-            (new ZookeeperConfig)
-                ->sessionTimeout(1000)
-        );
+        $zk = yield (new ZookeeperConnector)
+            ->sessionTimeout(1000)
+            ->connect();
 
         try {
             $this->assertEquals(1000, $zk->getSessionTimeout());
@@ -112,10 +111,9 @@ class ZookeeperTest extends AsyncTestCase
         });
 
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect(
-            (new ZookeeperConfig)
-                ->watcher($watcher)
-        );
+        $zk = yield (new ZookeeperConnector)
+            ->watcher($watcher)
+            ->connect();
 
         try {
             yield $zk->create('/foo', 'bar');
@@ -131,10 +129,9 @@ class ZookeeperTest extends AsyncTestCase
         $watcher = $this->createCallback(0);
 
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect(
-            (new ZookeeperConfig)
-                ->watcher($watcher)
-        );
+        $zk = yield (new ZookeeperConnector)
+            ->watcher($watcher)
+            ->connect();
 
         try {
             yield $zk->create('/foo', 'bar');
@@ -149,7 +146,7 @@ class ZookeeperTest extends AsyncTestCase
     public function testEphemeralNode()
     {
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL);
@@ -160,7 +157,7 @@ class ZookeeperTest extends AsyncTestCase
         }
 
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             $this->assertFalse(yield $zk->exists('/foo'));
@@ -172,7 +169,7 @@ class ZookeeperTest extends AsyncTestCase
     public function testSequentialNode()
     {
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
@@ -188,12 +185,11 @@ class ZookeeperTest extends AsyncTestCase
     public function testChrootPath()
     {
         /** @var Zookeeper $chrootedZk */
-        $chrootedZk = yield Zookeeper::connect(
-            (new ZookeeperConfig)
-                ->connectString('127.0.0.1/foo')
-        );
+        $chrootedZk = $zk = yield (new ZookeeperConnector)
+            ->connectString('127.0.0.1/foo')
+            ->connect();
         /** @var Zookeeper $zk */
-        $zk = yield Zookeeper::connect();
+        $zk = yield (new ZookeeperConnector)->connect();
 
         try {
             yield $zk->create('/foo', 'bar');

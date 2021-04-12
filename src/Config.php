@@ -8,7 +8,7 @@ use Closure;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
-class ZookeeperConfig
+class Config
 {
     private string          $connectString  = '127.0.0.1:2181';
     private int             $sessionTimeout = 5000;

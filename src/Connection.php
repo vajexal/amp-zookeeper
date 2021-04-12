@@ -48,7 +48,7 @@ class Connection
     {
     }
 
-    public static function connect(ConnectStringParser $connectStringParser, ZookeeperConfig $config): Promise
+    public static function connect(ConnectStringParser $connectStringParser, Config $config): Promise
     {
         return call(function () use ($connectStringParser, $config) {
             $connection = new self;
@@ -137,7 +137,7 @@ class Connection
         return $this->writePacket($packet);
     }
 
-    private function sendConnectRequest(ZookeeperConfig $config): Promise
+    private function sendConnectRequest(Config $config): Promise
     {
         $request = new ConnectRequest(0, 0, $config->getSessionTimeout(), 0, \str_repeat("\0", 16));
         $packet  = new Packet(null, $request);
