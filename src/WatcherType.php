@@ -6,7 +6,7 @@ namespace Vajexal\AmpZookeeper;
 
 use InvalidArgumentException;
 
-class WatcherType
+final class WatcherType
 {
     public const CHILDREN = 1;
     public const DATA     = 2;

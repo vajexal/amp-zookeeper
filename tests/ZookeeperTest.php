@@ -143,6 +143,27 @@ class ZookeeperTest extends AsyncTestCase
         }
     }
 
+    public function testPersistentWatches()
+    {
+        $watcher = $this->createCallback(2, function (WatcherEvent $event) {
+            $this->assertEquals('/foo', $event->getPath());
+        });
+
+        /** @var Zookeeper $zk */
+        $zk = yield (new ZookeeperConnector)
+            ->watcher($watcher)
+            ->connect();
+
+        try {
+            yield $zk->create('/foo', 'bar');
+            yield $zk->addWatch('/foo');
+            yield $zk->set('/foo', 'baz');
+            yield $zk->delete('/foo');
+        } finally {
+            yield $zk->close();
+        }
+    }
+
     public function testEphemeralNode()
     {
         /** @var Zookeeper $zk */

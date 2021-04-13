@@ -21,7 +21,7 @@ class GetEphemeralsResponse implements Record
         $bb->writeVector($this->ephemerals, fn (string $ephemeral) => $bb->writeString($ephemeral));
     }
 
-    public static function deserialize(ByteBuffer $bb): Record
+    public static function deserialize(ByteBuffer $bb): self
     {
         return new self(
             $bb->readVector(fn () => $bb->readString()),

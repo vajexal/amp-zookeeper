@@ -24,7 +24,7 @@ class ACL implements Record
         $bb->writeRecord($this->id);
     }
 
-    public static function deserialize(ByteBuffer $bb): Record
+    public static function deserialize(ByteBuffer $bb): self
     {
         return new self(
             $bb->readInt(),

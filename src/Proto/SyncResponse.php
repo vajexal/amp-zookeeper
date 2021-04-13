@@ -21,7 +21,7 @@ class SyncResponse implements Record
         $bb->writeString($this->path);
     }
 
-    public static function deserialize(ByteBuffer $bb): Record
+    public static function deserialize(ByteBuffer $bb): self
     {
         return new self(
             $bb->readString()

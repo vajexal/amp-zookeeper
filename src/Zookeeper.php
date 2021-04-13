@@ -7,9 +7,11 @@ namespace Vajexal\AmpZookeeper;
 use Amp\Promise;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
+use Vajexal\AmpZookeeper\Proto\AddWatchRequest;
 use Vajexal\AmpZookeeper\Proto\CreateRequest;
 use Vajexal\AmpZookeeper\Proto\CreateResponse;
 use Vajexal\AmpZookeeper\Proto\DeleteRequest;
+use Vajexal\AmpZookeeper\Proto\ErrorResponse;
 use Vajexal\AmpZookeeper\Proto\ExistsRequest;
 use Vajexal\AmpZookeeper\Proto\ExistsResponse;
 use Vajexal\AmpZookeeper\Proto\GetChildrenRequest;
@@ -263,6 +265,31 @@ class Zookeeper
             $requestHeader = new RequestHeader(OpCode::SYNC);
             $request       = new SyncRequest($serverPath);
             $packet        = new Packet($requestHeader, $request, SyncResponse::class);
+
+            try {
+                yield $this->connection->writePacket($packet);
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
+    }
+
+    /**
+     * @param string $path
+     * @param int $mode
+     * @return Promise<void>
+     */
+    public function addWatch(string $path, int $mode = AddWatchMode::PERSISTENT): Promise
+    {
+        return call(function () use ($path, $mode) {
+            AddWatchMode::validate($mode);
+            PathUtils::validatePath($path);
+
+            $serverPath = $this->prependChroot($path);
+
+            $requestHeader = new RequestHeader(OpCode::ADD_WATCH);
+            $request       = new AddWatchRequest($serverPath, $mode);
+            $packet        = new Packet($requestHeader, $request, ErrorResponse::class);
 
             try {
                 yield $this->connection->writePacket($packet);

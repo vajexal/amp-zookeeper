@@ -69,6 +69,8 @@ Loop::run(function () {
 });
 ```
 
+[Persistent watch](https://zookeeper.apache.org/doc/r3.7.0/zookeeperProgrammers.html#sc_WatchPersistentRecursive) can be added using `addWatch` method
+
 #### Ephemeral Nodes
 
 ```php
