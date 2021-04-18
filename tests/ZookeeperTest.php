@@ -29,29 +29,35 @@ class ZookeeperTest extends AsyncTestCase
         /** @var Zookeeper $zk */
         $zk = yield (new ZookeeperConnector)->connect();
 
-        try {
-            if (yield $zk->exists('/foo')) {
-                yield $zk->delete('/foo');
-            }
-
-            yield $zk->create('/foo', 'bar');
-            $this->assertEquals('bar', yield $zk->get('/foo'));
-
-            /** @var Stat $stat */
-            $stat = yield $zk->stat('/foo');
-            $this->assertEquals(3, $stat->getDataLength());
-
-            yield $zk->set('/foo', 'baz');
-            $this->assertEquals('baz', yield $zk->get('/foo'));
-
-            $this->assertContains('foo', yield $zk->getChildren('/'));
-
-            $this->assertTrue(yield $zk->exists('/foo'));
+        if (yield $zk->exists('/foo')) {
             yield $zk->delete('/foo');
-            $this->assertFalse(yield $zk->exists('/foo'));
-        } finally {
-            yield $zk->close();
         }
+
+        yield $zk->create('/foo', 'bar');
+        $this->assertEquals('bar', yield $zk->get('/foo'));
+
+        /** @var Stat $stat */
+        $stat = yield $zk->stat('/foo');
+        $this->assertEquals(3, $stat->getDataLength());
+
+        yield $zk->set('/foo', 'baz');
+        $this->assertEquals('baz', yield $zk->get('/foo'));
+
+        $this->assertContains('foo', yield $zk->getChildren('/'));
+
+        $this->assertTrue(yield $zk->exists('/foo'));
+        yield $zk->delete('/foo');
+        $this->assertFalse(yield $zk->exists('/foo'));
+
+        yield $zk->close();
+    }
+
+    public function testUnreference()
+    {
+        /** @var Zookeeper $zk */
+        $zk = yield (new ZookeeperConnector)->connect();
+
+        $this->assertFalse(yield $zk->exists('/foo'));
     }
 
     public function testSetEmptyNode()
@@ -61,11 +67,7 @@ class ZookeeperTest extends AsyncTestCase
         /** @var Zookeeper $zk */
         $zk = yield (new ZookeeperConnector)->connect();
 
-        try {
-            yield $zk->set('/foo', 'bar');
-        } finally {
-            yield $zk->close();
-        }
+        yield $zk->set('/foo', 'bar');
     }
 
     public function testCreateWhenNodeExists()
@@ -91,15 +93,13 @@ class ZookeeperTest extends AsyncTestCase
             ->sessionTimeout(1000)
             ->connect();
 
-        try {
-            $this->assertEquals(1000, $zk->getSessionTimeout());
+        $this->assertEquals(1000, $zk->getSessionTimeout());
 
-            yield new Delayed(2000);
+        yield new Delayed(2000);
 
-            yield $zk->sync('/foo');
-        } finally {
-            yield $zk->close();
-        }
+        yield $zk->sync('/foo');
+
+        yield $zk->close();
     }
 
     public function testWatches()
@@ -115,13 +115,11 @@ class ZookeeperTest extends AsyncTestCase
             ->watcher($watcher)
             ->connect();
 
-        try {
-            yield $zk->create('/foo', 'bar');
-            yield $zk->get('/foo', true);
-            yield $zk->delete('/foo');
-        } finally {
-            yield $zk->close();
-        }
+        yield $zk->create('/foo', 'bar');
+        yield $zk->get('/foo', true);
+        yield $zk->delete('/foo');
+
+        yield $zk->close();
     }
 
     public function testRemoveWatches()
@@ -133,14 +131,12 @@ class ZookeeperTest extends AsyncTestCase
             ->watcher($watcher)
             ->connect();
 
-        try {
-            yield $zk->create('/foo', 'bar');
-            yield $zk->get('/foo', true);
-            yield $zk->removeWatches('/foo');
-            yield $zk->delete('/foo');
-        } finally {
-            yield $zk->close();
-        }
+        yield $zk->create('/foo', 'bar');
+        yield $zk->get('/foo', true);
+        yield $zk->removeWatches('/foo');
+        yield $zk->delete('/foo');
+
+        yield $zk->close();
     }
 
     public function testPersistentWatches()
@@ -154,14 +150,12 @@ class ZookeeperTest extends AsyncTestCase
             ->watcher($watcher)
             ->connect();
 
-        try {
-            yield $zk->create('/foo', 'bar');
-            yield $zk->addWatch('/foo');
-            yield $zk->set('/foo', 'baz');
-            yield $zk->delete('/foo');
-        } finally {
-            yield $zk->close();
-        }
+        yield $zk->create('/foo', 'bar');
+        yield $zk->addWatch('/foo');
+        yield $zk->set('/foo', 'baz');
+        yield $zk->delete('/foo');
+
+        yield $zk->close();
     }
 
     public function testEphemeralNode()
@@ -180,11 +174,9 @@ class ZookeeperTest extends AsyncTestCase
         /** @var Zookeeper $zk */
         $zk = yield (new ZookeeperConnector)->connect();
 
-        try {
-            $this->assertFalse(yield $zk->exists('/foo'));
-        } finally {
-            $zk->close();
-        }
+        $this->assertFalse(yield $zk->exists('/foo'));
+
+        $zk->close();
     }
 
     public function testSequentialNode()
@@ -192,15 +184,13 @@ class ZookeeperTest extends AsyncTestCase
         /** @var Zookeeper $zk */
         $zk = yield (new ZookeeperConnector)->connect();
 
-        try {
-            yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
+        yield $zk->create('/foo', 'bar', CreateMode::EPHEMERAL_SEQUENTIAL);
 
-            $nodes = yield $zk->getChildren('/');
-            $nodes = \array_filter($nodes, fn (string $node) => \preg_match('/^foo\d{10}$/', $node));
-            $this->assertNotEmpty($nodes);
-        } finally {
-            yield $zk->close();
-        }
+        $nodes = yield $zk->getChildren('/');
+        $nodes = \array_filter($nodes, fn (string $node) => \preg_match('/^foo\d{10}$/', $node));
+        $this->assertNotEmpty($nodes);
+
+        yield $zk->close();
     }
 
     public function testChrootPath()
@@ -212,16 +202,14 @@ class ZookeeperTest extends AsyncTestCase
         /** @var Zookeeper $zk */
         $zk = yield (new ZookeeperConnector)->connect();
 
-        try {
-            yield $zk->create('/foo', 'bar');
-            yield $chrootedZk->create('/bar', 'baz', CreateMode::EPHEMERAL);
+        yield $zk->create('/foo', 'bar');
+        yield $chrootedZk->create('/bar', 'baz', CreateMode::EPHEMERAL);
 
-            $this->assertEquals(['bar'], yield $zk->getChildren('/foo'));
+        $this->assertEquals(['bar'], yield $zk->getChildren('/foo'));
 
-            yield $chrootedZk->close();
-            yield $zk->delete('/foo');
-        } finally {
-            yield $zk->close();
-        }
+        yield $chrootedZk->close();
+        yield $zk->delete('/foo');
+
+        yield $zk->close();
     }
 }

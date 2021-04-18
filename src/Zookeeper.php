@@ -37,6 +37,11 @@ class Zookeeper
     {
     }
 
+    public function __destruct()
+    {
+        Promise\rethrow($this->close());
+    }
+
     /**
      * @param Config $config
      * @return Promise<self>

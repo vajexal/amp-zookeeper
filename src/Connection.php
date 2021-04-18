@@ -48,6 +48,11 @@ class Connection
     {
     }
 
+    public function __destruct()
+    {
+        Promise\rethrow($this->close());
+    }
+
     public static function connect(ConnectStringParser $connectStringParser, Config $config): Promise
     {
         return call(function () use ($connectStringParser, $config) {
@@ -110,6 +115,9 @@ class Connection
 
             $packet->deferred                              = new Deferred;
             $this->queue[$packet->requestHeader->getXid()] = $packet;
+
+            $this->socket->reference();
+
             return $packet->deferred->promise();
         });
     }
@@ -199,6 +207,10 @@ class Connection
 
         $packet = $this->queue[$replyHeader->getXid()];
         unset($this->queue[$replyHeader->getXid()]);
+
+        if (empty($this->queue) && !$this->watcher) {
+            $this->socket->unreference();
+        }
 
         if ($replyHeader->getErr()) {
             $this->logger->error(\sprintf('Got reply header error %d', $replyHeader->getErr()));
