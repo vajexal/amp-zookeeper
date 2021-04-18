@@ -1,11 +1,11 @@
-Parody for [zookeeper](https://zookeeper.apache.org) client for [amphp](https://amphp.org)
+[Zookeeper](https://zookeeper.apache.org) client for [amphp](https://amphp.org)
 
 [![Build Status](https://github.com/vajexal/amp-zookeeper/workflows/Build/badge.svg)](https://github.com/vajexal/amp-zookeeper/actions)
 
 ### Installation
 
 ```bash
-composer require vajexal/amp-zookeeper:dev-master
+composer require vajexal/amp-zookeeper
 ```
 
 ### Usage
