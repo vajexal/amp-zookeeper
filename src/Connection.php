@@ -86,7 +86,7 @@ class Connection
                 $this->pingWatcherId = '';
             }
 
-            if ($this->socket->isClosed()) {
+            if (empty($this->socket) || $this->socket->isClosed()) {
                 return;
             }
 

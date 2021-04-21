@@ -65,7 +65,13 @@ class Zookeeper
      */
     public function close(): Promise
     {
-        return $this->connection->close();
+        return call(function () {
+            if (empty($this->connection)) {
+                return;
+            }
+
+            yield $this->connection->close();
+        });
     }
 
     /**
