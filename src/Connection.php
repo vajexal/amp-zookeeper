@@ -13,6 +13,7 @@ use Closure;
 use LogicException;
 use Psr\Log\LoggerInterface;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
+use Vajexal\AmpZookeeper\Exception\ZookeeperException;
 use Vajexal\AmpZookeeper\Proto\ConnectRequest;
 use Vajexal\AmpZookeeper\Proto\ConnectResponse;
 use Vajexal\AmpZookeeper\Proto\ReplyHeader;
@@ -39,9 +40,6 @@ class Connection
     private int    $maxIdleTime    = 0;
     private int    $lastSend       = 0;
 
-    private string    $waitForRecordClass    = '';
-    private ?Deferred $waitForRecordDeferred = null;
-
     private ?Closure $watcher;
 
     private function __construct()
@@ -66,13 +64,13 @@ class Connection
 
             yield $connection->sendConnectRequest($config);
 
-            Promise\rethrow($connection->listenForPackets());
-
             /** @var ConnectResponse $response */
-            $response = yield $connection->waitForRecord(ConnectResponse::class);
+            $response = yield $connection->waitForConnectResponse();
 
             $connection->sessionTimeout = $response->getTimeOut();
             $connection->setupPing();
+
+            Promise\rethrow($connection->listenForPackets());
 
             return $connection;
         });
@@ -153,6 +151,22 @@ class Connection
         return $this->writePacket($packet);
     }
 
+    private function waitForConnectResponse(): Promise
+    {
+        return call(function () {
+            $data = yield $this->socket->read();
+            if ($data === null) {
+                throw ZookeeperException::connectionClosed();
+            }
+
+            $bb = new ByteBuffer($data);
+            $this->logger->debug('read: ' . $bb->toHex());
+
+            $bb->readInt(); // len
+            return ConnectResponse::deserialize($bb);
+        });
+    }
+
     private function listenForPackets(): Promise
     {
         return call(function () {
@@ -176,14 +190,6 @@ class Connection
 
     private function readPacket(ByteBuffer $bb): void
     {
-        if ($this->waitForRecordClass) {
-            $response = $this->deserializeRecord($this->waitForRecordClass, $bb);
-            $this->waitForRecordDeferred->resolve($response);
-            $this->waitForRecordClass    = '';
-            $this->waitForRecordDeferred = null;
-            return;
-        }
-
         $replyHeader = ReplyHeader::deserialize($bb);
 
         if ($replyHeader->getXid() === self::PING_XID) {
@@ -234,14 +240,6 @@ class Connection
         }
 
         return $recordClass::deserialize($bb);
-    }
-
-    private function waitForRecord(string $recordClass): Promise
-    {
-        $this->waitForRecordClass    = $recordClass;
-        $this->waitForRecordDeferred = new Deferred;
-
-        return $this->waitForRecordDeferred->promise();
     }
 
     private function updateLastSend(): void
