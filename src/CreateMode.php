@@ -8,10 +8,13 @@ use InvalidArgumentException;
 
 final class CreateMode
 {
-    public const PERSISTENT            = 0;
-    public const EPHEMERAL             = 1;
-    public const PERSISTENT_SEQUENTIAL = 2;
-    public const EPHEMERAL_SEQUENTIAL  = 3;
+    public const PERSISTENT                     = 0;
+    public const EPHEMERAL                      = 1;
+    public const PERSISTENT_SEQUENTIAL          = 2;
+    public const EPHEMERAL_SEQUENTIAL           = 3;
+    public const CONTAINER                      = 4;
+    public const PERSISTENT_WITH_TTL            = 5;
+    public const PERSISTENT_SEQUENTIAL_WITH_TTL = 6;
 
     private function __construct()
     {
@@ -24,6 +27,9 @@ final class CreateMode
             self::EPHEMERAL,
             self::PERSISTENT_SEQUENTIAL,
             self::EPHEMERAL_SEQUENTIAL,
+            self::CONTAINER,
+            self::PERSISTENT_WITH_TTL,
+            self::PERSISTENT_SEQUENTIAL_WITH_TTL,
         ];
 
         if (!\in_array($mode, $modes, true)) {
@@ -33,6 +39,22 @@ final class CreateMode
 
     public static function isSequential(int $mode): bool
     {
-        return \in_array($mode, [self::PERSISTENT_SEQUENTIAL, self::EPHEMERAL_SEQUENTIAL], true);
+        static $sequentialModes = [
+            self::PERSISTENT_SEQUENTIAL,
+            self::EPHEMERAL_SEQUENTIAL,
+            self::PERSISTENT_SEQUENTIAL_WITH_TTL,
+        ];
+
+        return \in_array($mode, $sequentialModes, true);
+    }
+
+    public static function isTtl(int $mode): bool
+    {
+        static $ttlModes = [
+            self::PERSISTENT_WITH_TTL,
+            self::PERSISTENT_SEQUENTIAL_WITH_TTL,
+        ];
+
+        return \in_array($mode, $ttlModes, true);
     }
 }

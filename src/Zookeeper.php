@@ -8,8 +8,10 @@ use Amp\Promise;
 use Vajexal\AmpZookeeper\Data\Stat;
 use Vajexal\AmpZookeeper\Exception\KeeperException;
 use Vajexal\AmpZookeeper\Proto\AddWatchRequest;
+use Vajexal\AmpZookeeper\Proto\Create2Response;
 use Vajexal\AmpZookeeper\Proto\CreateRequest;
 use Vajexal\AmpZookeeper\Proto\CreateResponse;
+use Vajexal\AmpZookeeper\Proto\CreateTTLRequest;
 use Vajexal\AmpZookeeper\Proto\DeleteRequest;
 use Vajexal\AmpZookeeper\Proto\ErrorResponse;
 use Vajexal\AmpZookeeper\Proto\ExistsRequest;
@@ -94,6 +96,37 @@ class Zookeeper
 
             try {
                 /** @var CreateResponse $response */
+                $response = yield $this->connection->writePacket($packet);
+
+                return $this->chrootPath ? \mb_substr($response->getPath(), \mb_strlen($this->chrootPath)) : $response->getPath();
+            } catch (KeeperException $e) {
+                throw $e->withPath($path);
+            }
+        });
+    }
+
+    /**
+     * @param string $path
+     * @param string $data
+     * @param int $ttl in milliseconds
+     * @param int $createMode
+     * @return Promise<string>
+     */
+    public function createWithTtl(string $path, string $data, int $ttl, int $createMode = CreateMode::PERSISTENT_WITH_TTL): Promise
+    {
+        return call(function () use ($path, $data, $ttl, $createMode) {
+            CreateMode::validate($createMode);
+            PathUtils::validatePath($path, CreateMode::isSequential($createMode));
+            EphemeralType::validateTTL($createMode, $ttl);
+
+            $serverPath = $this->prependChroot($path);
+
+            $requestHeader = new RequestHeader(OpCode::CREATE_TTL);
+            $request       = new CreateTTLRequest($serverPath, $data, Ids::openACLUnsafe(), $createMode, $ttl);
+            $packet        = new Packet($requestHeader, $request, Create2Response::class);
+
+            try {
+                /** @var Create2Response $response */
                 $response = yield $this->connection->writePacket($packet);
 
                 return $this->chrootPath ? \mb_substr($response->getPath(), \mb_strlen($this->chrootPath)) : $response->getPath();
