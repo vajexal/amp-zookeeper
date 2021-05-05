@@ -57,4 +57,13 @@ final class CreateMode
 
         return \in_array($mode, $ttlModes, true);
     }
+
+    public static function isContainer(int $mode): bool
+    {
+        static $containerModes = [
+            self::CONTAINER,
+        ];
+
+        return \in_array($mode, $containerModes, true);
+    }
 }

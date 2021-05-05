@@ -80,22 +80,22 @@ class Zookeeper
      * @param string $path
      * @param string $data
      * @param int $createMode
+     * @param int $ttl in milliseconds
      * @return Promise<string>
      */
-    public function create(string $path, string $data, int $createMode = CreateMode::PERSISTENT): Promise
+    public function create(string $path, string $data, int $createMode = CreateMode::PERSISTENT, int $ttl = -1): Promise
     {
-        return call(function () use ($path, $data, $createMode) {
+        return call(function () use ($path, $data, $createMode, $ttl) {
             CreateMode::validate($createMode);
             PathUtils::validatePath($path, CreateMode::isSequential($createMode));
+            EphemeralType::validateTTL($createMode, $ttl);
 
             $serverPath = $this->prependChroot($path);
 
-            $requestHeader = new RequestHeader(OpCode::CREATE);
-            $request       = new CreateRequest($serverPath, $data, Ids::openACLUnsafe(), $createMode);
-            $packet        = new Packet($requestHeader, $request, CreateResponse::class);
+            $packet = $this->makeCreatePacker($serverPath, $data, $createMode, $ttl);
 
             try {
-                /** @var CreateResponse $response */
+                /** @var CreateResponse|Create2Response $response */
                 $response = yield $this->connection->writePacket($packet);
 
                 return $this->chrootPath ? \mb_substr($response->getPath(), \mb_strlen($this->chrootPath)) : $response->getPath();
@@ -105,35 +105,23 @@ class Zookeeper
         });
     }
 
-    /**
-     * @param string $path
-     * @param string $data
-     * @param int $ttl in milliseconds
-     * @param int $createMode
-     * @return Promise<string>
-     */
-    public function createWithTtl(string $path, string $data, int $ttl, int $createMode = CreateMode::PERSISTENT_WITH_TTL): Promise
+    private function makeCreatePacker(string $path, string $data, int $createMode, int $ttl): Packet
     {
-        return call(function () use ($path, $data, $ttl, $createMode) {
-            CreateMode::validate($createMode);
-            PathUtils::validatePath($path, CreateMode::isSequential($createMode));
-            EphemeralType::validateTTL($createMode, $ttl);
+        if (CreateMode::isContainer($createMode)) {
+            $requestHeader = new RequestHeader(OpCode::CREATE_CONTAINER);
+            $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), $createMode);
+            return new Packet($requestHeader, $request, Create2Response::class);
+        }
 
-            $serverPath = $this->prependChroot($path);
-
+        if (CreateMode::isTtl($createMode)) {
             $requestHeader = new RequestHeader(OpCode::CREATE_TTL);
-            $request       = new CreateTTLRequest($serverPath, $data, Ids::openACLUnsafe(), $createMode, $ttl);
-            $packet        = new Packet($requestHeader, $request, Create2Response::class);
+            $request       = new CreateTTLRequest($path, $data, Ids::openACLUnsafe(), $createMode, $ttl);
+            return new Packet($requestHeader, $request, Create2Response::class);
+        }
 
-            try {
-                /** @var Create2Response $response */
-                $response = yield $this->connection->writePacket($packet);
-
-                return $this->chrootPath ? \mb_substr($response->getPath(), \mb_strlen($this->chrootPath)) : $response->getPath();
-            } catch (KeeperException $e) {
-                throw $e->withPath($path);
-            }
-        });
+        $requestHeader = new RequestHeader(OpCode::CREATE);
+        $request       = new CreateRequest($path, $data, Ids::openACLUnsafe(), $createMode);
+        return new Packet($requestHeader, $request, CreateResponse::class);
     }
 
     /**
