@@ -5,6 +5,7 @@
         "amphp",
         "zookeeper"
     ],
+    "license": "Unlicense",
     "require": {
         "php": "^8.0",
         "ext-mbstring": "*",
